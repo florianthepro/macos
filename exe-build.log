@@ -1,0 +1,25 @@
+PS C:\Users\Win11 Pro> cd "C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main"
+PS C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main> .\build.ps1
+.\build.ps1 : Die Datei "C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main\build.ps1" kann
+nicht geladen werden, da die Ausführung von Skripts auf diesem System deaktiviert ist. Weitere Informationen finden
+Sie unter "about_Execution_Policies" (https:/go.microsoft.com/fwlink/?LinkID=135170).
+In Zeile:1 Zeichen:1
++ .\build.ps1
++ ~~~~~~~~~~~
+    + CategoryInfo          : Sicherheitsfehler: (:) [], PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess
+PS C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main> powershell -ExecutionPolicy Bypass -File .\build.ps1
+Assembling EFI payload from upstream releases...
+  fetch acidanthera/OpenCorePkg 1.0.7 -> OpenCore-1.0.7-RELEASE.zip
+  fetch acidanthera/Lilu 1.7.1 -> Lilu-1.7.1-RELEASE.zip
+  fetch acidanthera/VirtualSMC 1.3.7 -> VirtualSMC-1.3.7-RELEASE.zip
+  fetch acidanthera/WhateverGreen 1.7.0 -> WhateverGreen-1.7.0-RELEASE.zip
+EFI payload written: C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main\src\MacOsUsbSetup\Assets\efi-payload.zip
+Publishing setup.exe...
+C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main\build.ps1 : Die Benennung "dotnet" wurde
+nicht als Name eines Cmdlet, einer Funktion, einer Skriptdatei oder eines ausführbaren Programms erkannt. Überprüfen
+Sie die Schreibweise des Namens, oder ob der Pfad korrekt ist (sofern enthalten), und wiederholen Sie den Vorgang.
+    + CategoryInfo          : ObjectNotFound: (dotnet:String) [build.ps1], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException,build.ps1
+
+PS C:\Users\Win11 Pro\Downloads\macos-claude-macos-usb-installer-exe-bfvxsy\main>
