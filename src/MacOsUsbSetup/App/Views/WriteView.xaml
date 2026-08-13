@@ -1,0 +1,45 @@
+<UserControl x:Class="MacOsUsbSetup.App.Views.WriteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{Binding Headline}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Grid.Row="1" Text="{Binding Target}" Foreground="{StaticResource Text.Muted}" Margin="0,6,0,18" />
+
+        <DockPanel Grid.Row="2" LastChildFill="False" Margin="0,0,0,6">
+            <TextBlock DockPanel.Dock="Left" Text="{Binding Stage}" FontWeight="SemiBold" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding Fraction, StringFormat={}{0:P0}}"
+                       Foreground="{StaticResource Text.Muted}" />
+        </DockPanel>
+
+        <ProgressBar Grid.Row="3" Style="{StaticResource Bar}" Minimum="0" Maximum="1" Value="{Binding Fraction, Mode=OneWay}" />
+
+        <TextBlock Grid.Row="4" Text="{Binding Detail}" Foreground="{StaticResource Text.Muted}"
+                   FontSize="12" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+
+        <Border Grid.Row="5" Style="{StaticResource LogBox}" Margin="0,16,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+                <ItemsControl ItemsSource="{Binding Log}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Style="{StaticResource LogLine}" Text="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Style="{StaticResource Ghost}" Content="Abbrechen" Command="{Binding CancelCommand}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

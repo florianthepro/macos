@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+
+# Bundled EFI payload is produced by build.ps1 from upstream releases,
+# never committed (keeps the tree free of third-party binaries).
+src/MacOsUsbSetup/Assets/efi-payload.zip
+.efi-cache/
+
+# Editor
+.vs/
+.idea/
+*.suo

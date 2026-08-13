@@ -1,0 +1,117 @@
+#Requires -Version 5.1
+<#
+    build.ps1 - assembles the bundled EFI payload from upstream releases and
+    publishes setup.exe.
+
+    The application source contains none of the third-party boot binaries.
+    This script fetches them from their official sources, packs a single
+    efi-payload.zip that gets embedded into the executable, then publishes a
+    self-contained single-file setup.exe.
+
+    Usage:
+        ./build.ps1                 # assemble payload + publish
+        ./build.ps1 -PayloadOnly    # only refresh the embedded EFI payload
+        ./build.ps1 -SkipPayload    # publish using the existing payload
+#>
+[CmdletBinding()]
+param(
+    [switch]$PayloadOnly,
+    [switch]$SkipPayload,
+    [string]$OpenCoreVersion = '1.0.7',
+    [string]$LiluVersion     = '1.7.1',
+    [string]$VirtualSmcVersion = '1.3.7',
+    [string]$WhateverGreenVersion = '1.7.0'
+)
+
+$ErrorActionPreference = 'Stop'
+$root      = $PSScriptRoot
+$assets    = Join-Path $root 'src/MacOsUsbSetup/Assets'
+$cache     = Join-Path $root '.efi-cache'
+$staging   = Join-Path $cache 'staging'
+$payload   = Join-Path $assets 'efi-payload.zip'
+
+function Get-Release([string]$repo, [string]$tag, [string]$assetPattern, [string]$outFile) {
+    if (Test-Path $outFile) { return $outFile }
+    $url = "https://github.com/$repo/releases/download/$tag/$assetPattern"
+    Write-Host "  fetch $repo $tag -> $assetPattern"
+    Invoke-WebRequest -Uri $url -OutFile $outFile -UseBasicParsing
+    return $outFile
+}
+
+function Expand-Into([string]$zip, [string]$dest) {
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+}
+
+function Build-Payload {
+    Write-Host 'Assembling EFI payload from upstream releases...'
+    New-Item -ItemType Directory -Force -Path $cache, $assets | Out-Null
+    if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
+    $efi = New-Item -ItemType Directory -Force -Path (Join-Path $staging 'EFI')
+
+    # --- OpenCore RELEASE (bootloader, drivers, boot binaries) ---
+    $ocZip = Get-Release 'acidanthera/OpenCorePkg' $OpenCoreVersion "OpenCore-$OpenCoreVersion-RELEASE.zip" (Join-Path $cache 'oc.zip')
+    $ocDir = Join-Path $cache 'oc'
+    Expand-Into $ocZip $ocDir
+    Copy-Item (Join-Path $ocDir 'X64/EFI/BOOT') (Join-Path $efi 'BOOT') -Recurse -Force
+    Copy-Item (Join-Path $ocDir 'X64/EFI/OC')   (Join-Path $efi 'OC')   -Recurse -Force
+
+    $ocRoot   = Join-Path $efi 'OC'
+    $drivers  = Join-Path $ocRoot 'Drivers'
+    $kexts    = Join-Path $ocRoot 'Kexts'
+    New-Item -ItemType Directory -Force -Path $kexts | Out-Null
+
+    # Keep only the drivers we actually reference; drop the rest to stay minimal.
+    Get-ChildItem $drivers -File | Where-Object { $_.Name -ne 'OpenRuntime.efi' } | Remove-Item -Force
+
+    # --- HfsPlus.efi (read the HFS+ recovery image) from OcBinaryData ---
+    $hfs = Join-Path $drivers 'HfsPlus.efi'
+    Invoke-WebRequest -UseBasicParsing -OutFile $hfs `
+        -Uri 'https://raw.githubusercontent.com/acidanthera/OcBinaryData/master/Drivers/HfsPlus.efi'
+
+    # --- Base kexts required to boot the installer ---
+    $kextSources = @(
+        @{ repo = 'acidanthera/Lilu';          tag = $LiluVersion;          asset = "Lilu-$LiluVersion-RELEASE.zip";                   pick = 'Lilu.kext' },
+        @{ repo = 'acidanthera/VirtualSMC';     tag = $VirtualSmcVersion;    asset = "VirtualSMC-$VirtualSmcVersion-RELEASE.zip";       pick = 'VirtualSMC.kext' },
+        @{ repo = 'acidanthera/WhateverGreen';  tag = $WhateverGreenVersion; asset = "WhateverGreen-$WhateverGreenVersion-RELEASE.zip"; pick = 'WhateverGreen.kext' }
+    )
+    foreach ($k in $kextSources) {
+        $z = Get-Release $k.repo $k.tag $k.asset (Join-Path $cache ($k.pick + '.zip'))
+        $ex = Join-Path $cache ($k.pick + '-x')
+        Expand-Into $z $ex
+        $src = Get-ChildItem $ex -Recurse -Directory -Filter $k.pick | Select-Object -First 1
+        if (-not $src) { throw "kext $($k.pick) not found in $($k.asset)" }
+        Copy-Item $src.FullName (Join-Path $kexts $k.pick) -Recurse -Force
+    }
+
+    # OpenCore ships a placeholder Sample config; setup.exe writes the real one.
+    Get-ChildItem $ocRoot -Filter '*.plist' | Remove-Item -Force -ErrorAction SilentlyContinue
+
+    # AMD Vanilla kernel patches (only injected for AMD processors at write time).
+    Invoke-WebRequest -UseBasicParsing -OutFile (Join-Path $staging 'amd-patches.plist') `
+        -Uri 'https://raw.githubusercontent.com/AMD-OSX/AMD_Vanilla/master/patches.plist'
+
+    $manifest = [ordered]@{
+        openCore      = $OpenCoreVersion
+        lilu          = $LiluVersion
+        virtualSmc    = $VirtualSmcVersion
+        whateverGreen = $WhateverGreenVersion
+    } | ConvertTo-Json
+    Set-Content -Path (Join-Path $staging 'payload.json') -Value $manifest -Encoding UTF8
+
+    if (Test-Path $payload) { Remove-Item $payload -Force }
+    Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $payload -Force
+    Write-Host "EFI payload written: $payload"
+}
+
+function Publish-Exe {
+    Write-Host 'Publishing setup.exe...'
+    $proj = Join-Path $root 'src/MacOsUsbSetup/MacOsUsbSetup.csproj'
+    $out  = Join-Path $root 'publish'
+    dotnet publish $proj -c Release -r win-x64 -o $out
+    if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
+    Write-Host ("Done: {0}" -f (Join-Path $out 'setup.exe'))
+}
+
+if (-not $SkipPayload) { Build-Payload }
+if (-not $PayloadOnly) { Publish-Exe }
