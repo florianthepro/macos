@@ -1,17 +1,18 @@
 #Requires -Version 5.1
 <#
     build.ps1 - assembles the bundled EFI payload from upstream releases and
-    publishes setup.exe.
+    publishes setup.exe. Invoked by build.bat in the repository root.
 
     The application source contains none of the third-party boot binaries.
     This script fetches them from their official sources, packs a single
     efi-payload.zip that gets embedded into the executable, then publishes a
-    self-contained single-file setup.exe.
+    self-contained single-file setup.exe. The .NET 8 SDK is located
+    automatically, and installed via winget when missing.
 
     Usage:
-        ./build.ps1                 # assemble payload + publish
-        ./build.ps1 -PayloadOnly    # only refresh the embedded EFI payload
-        ./build.ps1 -SkipPayload    # publish using the existing payload
+        powershell -ExecutionPolicy Bypass -File src\build.ps1
+        ... -PayloadOnly    # only refresh the embedded EFI payload
+        ... -SkipPayload    # publish using the existing payload
 #>
 [CmdletBinding()]
 param(
@@ -24,7 +25,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root      = $PSScriptRoot
+# This script lives in src/, so the repository root is its parent.
+$root      = Split-Path -Parent $PSScriptRoot
 $assets    = Join-Path $root 'src/MacOsUsbSetup/Assets'
 $cache     = Join-Path $root '.efi-cache'
 $staging   = Join-Path $cache 'staging'
@@ -41,6 +43,32 @@ function Get-Release([string]$repo, [string]$tag, [string]$assetPattern, [string
 function Expand-Into([string]$zip, [string]$dest) {
     if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
     Expand-Archive -Path $zip -DestinationPath $dest -Force
+}
+
+function Resolve-Dotnet {
+    $found = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
+    if ($found) { return $found }
+
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'dotnet\dotnet.exe'),
+        (Join-Path $env:LocalAppData 'Microsoft\dotnet\dotnet.exe')
+    )
+    foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host 'dotnet nicht gefunden - .NET 8 SDK wird via winget installiert...'
+        winget install --id Microsoft.DotNet.SDK.8 -e --source winget `
+            --accept-package-agreements --accept-source-agreements
+        foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
+    }
+
+    throw @'
+.NET 8 SDK nicht gefunden.
+Installieren und build.bat erneut ausfuehren:
+  winget install Microsoft.DotNet.SDK.8
+oder herunterladen: https://dotnet.microsoft.com/download/dotnet/8.0
+'@
 }
 
 function Build-Payload {
@@ -105,12 +133,13 @@ function Build-Payload {
 }
 
 function Publish-Exe {
-    Write-Host 'Publishing setup.exe...'
+    $dotnet = Resolve-Dotnet
+    Write-Host "Publishing setup.exe (dotnet: $dotnet)..."
     $proj = Join-Path $root 'src/MacOsUsbSetup/MacOsUsbSetup.csproj'
     $out  = Join-Path $root 'publish'
-    dotnet publish $proj -c Release -r win-x64 -o $out
-    if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
-    Write-Host ("Done: {0}" -f (Join-Path $out 'setup.exe'))
+    & $dotnet publish $proj -c Release -r win-x64 -o $out
+    if ($LASTEXITCODE -ne 0) { throw 'dotnet publish fehlgeschlagen' }
+    Write-Host ("Fertig: {0}" -f (Join-Path $out 'setup.exe'))
 }
 
 if (-not $SkipPayload) { Build-Payload }

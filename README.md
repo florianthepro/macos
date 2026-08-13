@@ -25,26 +25,32 @@ Für Linux gibt es dasselbe als Kommandozeilen-Werkzeug: **`setup.sh`**.
 ## Voraussetzungen
 
 - Windows 10/11 x64
-- .NET SDK 8 (nur zum Bauen)
-- PowerShell 5.1+ (für `build.ps1`)
+- .NET SDK 8 (nur zum Bauen; wird sonst automatisch per `winget` installiert)
+- PowerShell 5.1+ (in Windows enthalten)
 - Administratorrechte zur Laufzeit (Partitionieren/Formatieren)
 - Internetverbindung beim ersten Lauf (Apple-Recovery-Download)
 
-## Bauen
+## Bauen (Windows)
 
-```powershell
-./build.ps1
+Doppelklick auf **`build.bat`** – oder in der Eingabeaufforderung:
+
+```bat
+build.bat
 ```
 
-`build.ps1` lädt die offiziellen OpenCore-, Lilu-, VirtualSMC- und
+`build.bat` ruft `src\build.ps1` mit umgangener Ausführungsrichtlinie auf. Das
+Skript lädt die offiziellen OpenCore-, Lilu-, VirtualSMC- und
 WhateverGreen-Releases sowie `HfsPlus.efi` und die AMD-Vanilla-Kernel-Patches,
 packt daraus `efi-payload.zip` (wird in die exe eingebettet) und veröffentlicht
-anschließend eine eigenständige `publish/setup.exe`.
+`publish\setup.exe`. Das **.NET-8-SDK** wird automatisch gesucht und, falls es
+fehlt, über `winget` installiert.
 
-Optionen:
+`setup.exe` kannst du danach manuell hochladen.
 
-- `./build.ps1 -PayloadOnly` – nur die eingebettete EFI-Nutzlast neu bauen
-- `./build.ps1 -SkipPayload` – mit vorhandener Nutzlast veröffentlichen
+Optionen (werden an `src\build.ps1` durchgereicht):
+
+- `build.bat -PayloadOnly` – nur die eingebettete EFI-Nutzlast neu bauen
+- `build.bat -SkipPayload` – mit vorhandener Nutzlast veröffentlichen
 
 ## Linux: setup.sh
 
