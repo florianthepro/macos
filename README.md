@@ -108,6 +108,10 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 - Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), die Basis-SSDTs
   (EC/USBX, PLUG, PNLF) und einen passenden MacBookPro-SMBIOS. OpenCore schreibt
   zusätzlich ein Protokoll (`opencore-*.txt`) auf den USB-Stick.
+- CFG-Lock (gesperrtes MSR `0xE2`) ist in Standard-Laptop-BIOS meist aktiv und
+  lässt sich dort nicht abschalten; macOS würde sonst früh mit einem Kernel-Panic
+  abstürzen. Der passende Quirk wird je nach CPU automatisch gesetzt
+  (`AppleXcpmCfgLock` ab Haswell, sonst `AppleCpuPmCfgLock`).
 - Die iGPU-Framebuffer-ID wird anhand der PCI-Geräte-ID der Grafikeinheit
   gesetzt, nicht anhand der CPU – so wird z. B. die UHD 620 im ThinkPad T480
   (Kaby-Lake-R, `0x87C00000` + Framebuffer-Patches) von der baugleichen HD 620

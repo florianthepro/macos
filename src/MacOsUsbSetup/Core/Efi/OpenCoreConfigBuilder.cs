@@ -28,8 +28,9 @@ public sealed class OpenCoreConfigBuilder
         var isAmd = hardware.Processor.Vendor == CpuVendor.Amd;
         var isLaptop = IsLaptop(hardware);
         var needsCurrentCpuInfo = isAmd || IsIntelHybrid(hardware.Processor);
+        var (xcpmCfgLock, cpuPmCfgLock) = CfgLockQuirks(hardware.Processor);
 
-        var kernel = BuildKernel(needsCurrentCpuInfo);
+        var kernel = BuildKernel(needsCurrentCpuInfo, xcpmCfgLock, cpuPmCfgLock);
         if (isAmd)
             ApplyAmdPatches(kernel, hardware);
         if (isLaptop && kernel["Add"] is object?[] baseKexts)
@@ -87,7 +88,8 @@ public sealed class OpenCoreConfigBuilder
             ("SignalAppleOS", false), ("SyncRuntimePermissions", true)),
     };
 
-    private static Dictionary<string, object?> BuildKernel(bool provideCurrentCpuInfo) => new(StringComparer.Ordinal)
+    private static Dictionary<string, object?> BuildKernel(
+        bool provideCurrentCpuInfo, bool xcpmCfgLock, bool cpuPmCfgLock) => new(StringComparer.Ordinal)
     {
         ["Add"] = new object?[]
         {
@@ -102,7 +104,7 @@ public sealed class OpenCoreConfigBuilder
         ["Force"] = Array.Empty<object?>(),
         ["Patch"] = Array.Empty<object?>(),
         ["Quirks"] = D(
-            ("AppleCpuPmCfgLock", false), ("AppleXcpmCfgLock", false), ("AppleXcpmExtraMsrs", false),
+            ("AppleCpuPmCfgLock", cpuPmCfgLock), ("AppleXcpmCfgLock", xcpmCfgLock), ("AppleXcpmExtraMsrs", false),
             ("AppleXcpmForceBoost", false), ("CustomPciSerialDevice", false), ("CustomSMBIOSGuid", false),
             ("DisableIoMapper", true), ("DisableIoMapperMapping", false), ("DisableLinkeditJettison", true),
             ("DisableRtcChecksum", false), ("ExtendBTFeatureFlags", false), ("ExternalDiskIcons", false),
@@ -382,6 +384,19 @@ public sealed class OpenCoreConfigBuilder
 
     private static bool IsIntelHybrid(ProcessorInfo cpu) =>
         cpu.Vendor == CpuVendor.Intel && cpu.Family == 6 && cpu.Model is 151 or 154 or 183;
+
+    // CFG Lock (a locked MSR 0xE2) is enabled by default on most stock laptop firmware and
+    // cannot be turned off there. macOS panics early when its power management writes that
+    // MSR, so patch the write out. Haswell and newer use native XCPM (AppleXcpmCfgLock);
+    // Sandy/Ivy Bridge and older use the legacy path (AppleCpuPmCfgLock). Harmless when the
+    // firmware already leaves CFG Lock open.
+    private static (bool XcpmCfgLock, bool CpuPmCfgLock) CfgLockQuirks(ProcessorInfo cpu)
+    {
+        if (cpu.Vendor != CpuVendor.Intel || cpu.Family != 6)
+            return (false, false);
+        var legacy = cpu.Model is 42 or 58 || (cpu.Model > 0 && cpu.Model <= 47);
+        return legacy ? (false, true) : (true, false);
+    }
 
     private static Dictionary<string, object?> D(params (string Key, object? Value)[] entries)
     {

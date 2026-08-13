@@ -413,12 +413,23 @@ generate_config() {
   local is_amd=0; [[ "$CPU_VENDOR" == "amd" ]] && is_amd=1
   local igpu_dev=""; [[ "$IS_LAPTOP" -eq 1 && "$CPU_VENDOR" == "intel" ]] && igpu_dev="$INTEL_IGPU_DEV"
 
-  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" <<'PY'
+  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" "$CPU_VENDOR" "$CPU_MODEL" <<'PY'
 import sys, secrets, plistlib
 
 out, smbios, is_amd, cores, amd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", int(sys.argv[4]), sys.argv[5]
 is_laptop = sys.argv[6] == "1"
 igpu_dev = int(sys.argv[7], 16) if len(sys.argv) > 7 and sys.argv[7] else None
+cpu_intel = len(sys.argv) > 8 and sys.argv[8] == "intel"
+cpu_model = int(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9] else 0
+
+# CFG Lock (locked MSR 0xE2) panics macOS early on most stock laptop firmware; patch the
+# write out. Haswell+ uses native XCPM, Sandy/Ivy and older the legacy path.
+xcpm_cfg_lock = cpu_pm_cfg_lock = False
+if cpu_intel:
+    if cpu_model in (42, 58) or (0 < cpu_model <= 47):
+        cpu_pm_cfg_lock = True
+    else:
+        xcpm_cfg_lock = True
 
 def kext(bundle, exe):
     return {"Arch": "x86_64", "BundlePath": bundle, "Comment": "", "Enabled": True,
@@ -434,7 +445,7 @@ kernel = {
     "Block": [], "Force": [], "Patch": [],
     "Emulate": {"Cpuid1Data": b"", "Cpuid1Mask": b"", "DummyPowerManagement": False,
                 "MaxKernel": "", "MinKernel": ""},
-    "Quirks": {"AppleCpuPmCfgLock": False, "AppleXcpmCfgLock": False, "AppleXcpmExtraMsrs": False,
+    "Quirks": {"AppleCpuPmCfgLock": cpu_pm_cfg_lock, "AppleXcpmCfgLock": xcpm_cfg_lock, "AppleXcpmExtraMsrs": False,
                "AppleXcpmForceBoost": False, "CustomPciSerialDevice": False, "CustomSMBIOSGuid": False,
                "DisableIoMapper": True, "DisableIoMapperMapping": False, "DisableLinkeditJettison": True,
                "DisableRtcChecksum": False, "ExtendBTFeatureFlags": False, "ExternalDiskIcons": False,
