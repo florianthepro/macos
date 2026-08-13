@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using MacOsUsbSetup.Core.Compatibility;
 using MacOsUsbSetup.Core.Diagnostics;
+using MacOsUsbSetup.Core.Graphics;
 using MacOsUsbSetup.Core.Hardware;
 using MacOsUsbSetup.Core.PropertyList;
 
@@ -285,11 +286,12 @@ public sealed class OpenCoreConfigBuilder
         Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
     };
 
-    // Intel iGPU framebuffer for the internal laptop display, selected from the GPU's
-    // PCI device-id. The device-id is the reliable signal: Kaby Lake and Kaby Lake-R
-    // share a CPU model but need different framebuffers. Returns the DeviceProperties
-    // "Add" map plus any extra boot-arguments. An unrecognised Intel laptop iGPU falls
-    // back to the firmware (VESA) framebuffer, so the installer still shows a picture.
+    // Intel iGPU framebuffer for the internal laptop display, resolved from the GPU's PCI
+    // device-id against the shared IntelIgpuCatalog. The device-id is the reliable signal
+    // (Kaby Lake and Kaby Lake-R share a CPU model but need different framebuffers). Returns
+    // the DeviceProperties "Add" map plus any extra boot-arguments. An Intel iGPU with no
+    // catalogued framebuffer falls back to the firmware (VESA) framebuffer so the installer
+    // still shows a picture.
     private static (Dictionary<string, object?> Properties, string ExtraBootArgs) BuildIntelGraphics(
         HardwareInventory hardware, bool isLaptop)
     {
@@ -301,55 +303,42 @@ public sealed class OpenCoreConfigBuilder
         if (igpu is null)
             return (add, "");
 
-        var (platformId, spoofDeviceId) = IntelFramebuffer(igpu.PciDeviceId);
-        if (platformId is null)
+        var entry = IntelIgpuCatalog.Lookup(igpu.PciDeviceId);
+        if (entry?.PlatformId is null)
         {
-            Log.Info("Intel-iGPU nicht klassifiziert: VESA-Framebuffer (unbeschleunigt) für eine sichere Anzeige.");
+            Log.Info("Intel-iGPU ohne bekannten Framebuffer: VESA (unbeschleunigt) für eine sichere Anzeige.");
             return (add, " -igfxvesa");
         }
 
         var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["AAPL,ig-platform-id"] = platformId,
-            ["framebuffer-patch-enable"] = new byte[] { 0x01, 0x00, 0x00, 0x00 },
-            // 19 MB stolen + 9 MB framebuffer works with the 32 MB DVMT-prealloc that
-            // laptop firmware usually locks; harmless when more memory is available.
-            ["framebuffer-stolenmem"] = new byte[] { 0x00, 0x00, 0x30, 0x01 },
-            ["framebuffer-fbmem"] = new byte[] { 0x00, 0x00, 0x90, 0x00 },
+            ["AAPL,ig-platform-id"] = Le(entry.PlatformId.Value),
         };
-        if (spoofDeviceId is not null)
-            properties["device-id"] = spoofDeviceId;
+        if (entry.SpoofDeviceId is not null)
+            properties["device-id"] = Le(entry.SpoofDeviceId.Value);
+        AddMemoryPatch(properties, entry.MemoryPatch);
 
         add["PciRoot(0x0)/Pci(0x2,0x0)"] = properties;
+        Log.Info($"iGPU-Framebuffer: {entry.Family} (ig-platform-id 0x{entry.PlatformId.Value:X8}).");
         return (add, "");
     }
 
-    // Maps an Intel iGPU PCI device-id to its OpenCore framebuffer (little-endian
-    // ig-platform-id) and, where the real part is not natively supported, a device-id
-    // to spoof to a supported one. Null means no known framebuffer.
-    private static (byte[]? PlatformId, byte[]? SpoofDeviceId) IntelFramebuffer(int deviceId)
+    // Framebuffer memory patch for firmware that locks DVMT-prealloc at 32 MB. The stolen/fb
+    // values are harmless when more memory is available.
+    private static void AddMemoryPatch(Dictionary<string, object?> props, IgpuMemoryPatch patch)
     {
-        bool In(int lo, int hi) => deviceId >= lo && deviceId <= hi;
-
-        // Kaby Lake-R UHD 620 (e.g. i5-8350U in a ThinkPad T480): own framebuffer,
-        // spoofed to the supported HD 620.
-        if (deviceId == 0x5917)
-            return (Le(0x87C00000), Le(0x00005916));
-
-        // Skylake HD 5xx / Iris.
-        if (In(0x1900, 0x193F))
-            return (Le(0x19160000), null);
-
-        // Kaby Lake HD 620 / UHD 620 / HD 630.
-        if (In(0x5900, 0x593F))
-            return (Le(0x59160000), null);
-
-        // Coffee Lake / Whiskey Lake / Comet Lake UHD 620 / UHD 630: shared framebuffer,
-        // spoofed to the reference UHD 630.
-        if (In(0x3E00, 0x3EFF) || In(0x9B00, 0x9BFF))
-            return (Le(0x3EA50009), Le(0x00003EA5));
-
-        return (null, null);
+        switch (patch)
+        {
+            case IgpuMemoryPatch.StolenFb:
+                props["framebuffer-patch-enable"] = new byte[] { 0x01, 0x00, 0x00, 0x00 };
+                props["framebuffer-stolenmem"] = new byte[] { 0x00, 0x00, 0x30, 0x01 };
+                props["framebuffer-fbmem"] = new byte[] { 0x00, 0x00, 0x90, 0x00 };
+                break;
+            case IgpuMemoryPatch.HaswellCursor:
+                props["framebuffer-patch-enable"] = new byte[] { 0x01, 0x00, 0x00, 0x00 };
+                props["framebuffer-cursormem"] = new byte[] { 0x00, 0x00, 0x90, 0x00 };
+                break;
+        }
     }
 
     private static byte[] Le(uint value) => new[]

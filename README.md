@@ -79,6 +79,7 @@ erzeugte Stick ist identisch zu dem der `setup.exe`.
 | --- | --- |
 | `Core/Hardware` | WMI-Hardware-Scan (CPU, GPU, Firmware, RAM) |
 | `Core/Compatibility` | macOS-Kompatibilitätsmatrix je CPU/GPU |
+| `Core/Graphics` | Intel-iGPU-Verzeichnis (Framebuffer + macOS-Obergrenze je Geräte-ID) |
 | `Core/Recovery`, `Core/Download` | Apple-Recovery-Abruf (macrecovery-Port) + Chunklist-Prüfung |
 | `Core/Usb` | USB-Erkennung und FAT32-Vorbereitung (diskpart) |
 | `Core/Efi` | OpenCore-EFI + hardware-spezifische `config.plist` |
@@ -116,12 +117,15 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
   Firmware lässt Laufzeitspeicher schreibgeschützt, wodurch der Kernel sonst früh
   auf einer Nur-Lese-Seite abstürzt („No mapping exists for frame pointer"). Die
   Speicher-Quirks entsprechen der geprüften T480-Referenzkonfiguration.
-- Die iGPU-Framebuffer-ID wird anhand der PCI-Geräte-ID der Grafikeinheit
-  gesetzt, nicht anhand der CPU – so wird z. B. die UHD 620 im ThinkPad T480
-  (Kaby-Lake-R, `0x87C00000` + Framebuffer-Patches) von der baugleichen HD 620
-  (Kaby Lake, `0x59160000`) unterschieden. Skylake, Coffee/Comet Lake werden
-  ebenso erkannt. Eine unbekannte Intel-iGPU bekommt den VESA-Framebuffer
-  (`-igfxvesa`), damit die Installation trotzdem ein Bild zeigt.
+- Die iGPU-Framebuffer-ID kommt aus einem Verzeichnis (`Core/Graphics/IntelIgpuCatalog`),
+  das jede Intel-Grafik-Generation von Sandy Bridge bis Ice Lake anhand der
+  PCI-Geräte-ID abbildet – nicht anhand der CPU. So wird z. B. die UHD 620 im
+  ThinkPad T480 (Kaby-Lake-R, `0x87C00000` + Spoof + Framebuffer-Patches) von der
+  baugleichen HD 620 (Kaby Lake, `0x59160000`) unterschieden. Dasselbe Verzeichnis
+  liefert auch die macOS-Obergrenze für die Kacheln, damit Framebuffer und
+  Kompatibilität nie auseinanderlaufen. Eine unbekannte oder treiberlose Intel-iGPU
+  (z. B. Tiger Lake und neuer) bekommt den VESA-Framebuffer (`-igfxvesa`), damit die
+  Installation trotzdem ein Bild zeigt. `setup.sh` spiegelt dieselbe Tabelle.
 - Die Kacheln zeigen für Intel-iGPUs die höchste sinnvolle Version (bei Kaby
   Lake z. B. Ventura), da neuere macOS-Versionen keine passenden Treiber mehr
   enthalten. Hängt der Bootvorgang bei `[EB|LOG:EXITBS:START]`, ist das ein

@@ -163,7 +163,8 @@ cpu_window() {
     60|61|69|70|71)   C_SUP=24; C_EXP=25; C_NOTE="Haswell/Broadwell: Tahoe nur experimentell" ;;
     78|94|85|165|166) C_SUP=25; C_EXP=25; C_NOTE="" ;;
     142|158)          C_SUP=25; C_EXP=25; C_NOTE="" ;;
-    140|141)          C_SUP=25; C_EXP=25; C_ALWAYS=1; C_NOTE="Ice/Tiger Lake: auf Desktop ggf. CPUFriend" ;;
+    125|126)          C_SUP=25; C_EXP=25; C_ALWAYS=1; C_NOTE="Ice Lake: auf Desktop ggf. CPUFriend" ;;
+    140|141)          C_SUP=25; C_EXP=25; C_ALWAYS=1; C_NOTE="Tiger Lake: auf Desktop ggf. CPUFriend" ;;
     151|154|183)      C_SUP=-1; C_EXP=25; C_ALWAYS=1; C_NOTE="Hybrid-CPU: E-Cores ggf. deaktivieren" ;;
     *)                if (( CPU_MODEL <= 47 )); then C_SUP=18; C_EXP=18; C_NOTE="alte Intel-CPU (maximal Mojave)";
                       else C_SUP=-1; C_EXP=25; C_ALWAYS=1; C_NOTE="Intel-CPU nicht klassifiziert"; fi ;;
@@ -185,14 +186,17 @@ gpu_adapter_window() {
       elif (( (dec>=16#67C0 && dec<=16#67FF) || (dec>=16#6980 && dec<=16#699F) || (dec>=16#6860 && dec<=16#687F) || (dec>=16#69A0 && dec<=16#69AF) || (dec>=16#66A0 && dec<=16#66BF) )); then G_SUP=25; G_EXP=25
       else G_SUP=21; G_EXP=21; G_NOTE="Alte AMD-GCN: maximal Monterey"; fi ;;
     8086)
-      if   (( dec >= 16#0150 && dec <= 16#016F )); then G_SUP=20; G_EXP=20; G_NOTE="Intel HD 4000: maximal Big Sur"
-      elif (( (dec>=16#0400 && dec<=16#0D3F) || (dec>=16#1600 && dec<=16#163F) )); then G_SUP=21; G_EXP=21; G_NOTE="Intel HD 5000/Iris: maximal Monterey"
-      elif (( dec >= 16#1900 && dec <= 16#193F )); then G_SUP=21; G_EXP=22; G_NOTE="Intel Skylake-iGPU: maximal Monterey"
-      elif (( dec >= 16#5900 && dec <= 16#593F )); then G_SUP=22; G_EXP=23; G_NOTE="Intel Kaby-Lake-iGPU (HD/UHD 620/630): maximal Ventura"
-      elif (( dec >= 16#3E00 && dec <= 16#3EFF )); then G_SUP=22; G_EXP=23; G_NOTE="Intel Coffee-Lake-iGPU (UHD 630): maximal Ventura"
-      elif (( dec >= 16#9B00 && dec <= 16#9BFF )); then G_SUP=23; G_EXP=24; G_NOTE="Intel Comet-Lake-iGPU (UHD 630): maximal Sonoma"
-      elif (( (dec>=16#8A50 && dec<=16#8A5F) || (dec>=16#9A40 && dec<=16#9A7F) )); then G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Intel Ice/Tiger Lake-iGPU: eingeschraenkt"
-      else G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Intel-iGPU nicht klassifiziert"; fi ;;
+      # Ceilings mirror the C# IntelIgpuCatalog (most-specific ranges first).
+      if   (( dec >= 16#0100 && dec <= 16#014F )); then G_SUP=17; G_EXP=17; G_NOTE="Intel HD 3000 (Sandy Bridge): maximal High Sierra"
+      elif (( dec >= 16#0150 && dec <= 16#016F )); then G_SUP=20; G_EXP=20; G_NOTE="Intel HD 4000 (Ivy Bridge): maximal Big Sur"
+      elif (( dec >= 16#0400 && dec <= 16#0D3F )); then G_SUP=21; G_EXP=21; G_NOTE="Intel HD 4400/4600/5000 (Haswell): maximal Monterey"
+      elif (( dec >= 16#1600 && dec <= 16#163F )); then G_SUP=21; G_EXP=21; G_NOTE="Intel HD 5500/6000 (Broadwell): maximal Monterey"
+      elif (( dec >= 16#1900 && dec <= 16#193F )); then G_SUP=21; G_EXP=22; G_NOTE="Intel HD 5xx (Skylake): maximal Monterey"
+      elif (( dec >= 16#5900 && dec <= 16#593F )); then G_SUP=22; G_EXP=23; G_NOTE="Intel HD/UHD 620/630 (Kaby Lake): maximal Ventura"
+      elif (( dec >= 16#3E00 && dec <= 16#3EFF )); then G_SUP=22; G_EXP=23; G_NOTE="Intel UHD 630 (Coffee Lake): maximal Ventura"
+      elif (( dec >= 16#9B00 && dec <= 16#9BFF )); then G_SUP=23; G_EXP=24; G_NOTE="Intel UHD 630 (Comet Lake): maximal Sonoma"
+      elif (( dec >= 16#8A50 && dec <= 16#8A7F )); then G_SUP=23; G_EXP=24; G_NOTE="Intel Iris Plus (Ice Lake): maximal Sonoma"
+      else G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Intel-iGPU nicht klassifiziert - nur VESA (unbeschleunigt)"; fi ;;
     *) G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Grafik-Hersteller unbekannt" ;;
   esac
 }
@@ -487,27 +491,39 @@ def le(v):
     return bytes([v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF])
 
 def intel_framebuffer(dev):
-    # (ig-platform-id, device-id spoof) by GPU PCI device-id; None = no known match.
-    if dev == 0x5917:                       return le(0x87C00000), le(0x00005916)  # Kaby Lake-R UHD 620 (T480)
-    if 0x1900 <= dev <= 0x193F:             return le(0x19160000), None            # Skylake HD 5xx / Iris
-    if 0x5900 <= dev <= 0x593F:             return le(0x59160000), None            # Kaby Lake HD/UHD 620/630
-    if (0x3E00 <= dev <= 0x3EFF) or (0x9B00 <= dev <= 0x9BFF):
-        return le(0x3EA50009), le(0x00003EA5)                                      # Coffee/Comet Lake UHD 620/630
-    return None, None
+    # (ig-platform-id, device-id spoof, mem-patch) by GPU PCI device-id. Mirrors the C#
+    # IntelIgpuCatalog: exact parts first, then generational ranges. None platform = VESA.
+    if dev == 0x5917:            return le(0x87C00000), le(0x00005916), 'stolenfb'  # Kaby Lake-R UHD 620 (T480)
+    if 0x3EA0 <= dev <= 0x3EA1:  return le(0x3E9B0000), le(0x00003E9B), 'stolenfb'  # Whiskey Lake UHD 620
+    if dev == 0x9B41:            return le(0x3E9B0000), le(0x00003E9B), 'stolenfb'  # Comet Lake-U UHD 620
+    if 0x0100 <= dev <= 0x014F:  return None, None, None                            # Sandy Bridge -> VESA
+    if 0x0150 <= dev <= 0x016F:  return le(0x01660003), None, None                  # Ivy Bridge HD 4000
+    if 0x0400 <= dev <= 0x0D3F:  return le(0x0A260006), le(0x00000412), 'cursor'    # Haswell
+    if 0x1600 <= dev <= 0x163F:  return le(0x16260006), le(0x00001626), 'stolenfb'  # Broadwell
+    if 0x1900 <= dev <= 0x193F:  return le(0x19160000), None, 'stolenfb'            # Skylake
+    if 0x5900 <= dev <= 0x593F:  return le(0x59160000), None, 'stolenfb'            # Kaby Lake
+    if 0x3E00 <= dev <= 0x3EFF:  return le(0x3EA50009), le(0x00003EA5), 'stolenfb'  # Coffee Lake
+    if 0x9B00 <= dev <= 0x9BFF:  return le(0x3EA50009), le(0x00003EA5), 'stolenfb'  # Comet Lake
+    if 0x8A50 <= dev <= 0x8A7F:  return le(0x8A520000), None, 'stolenfb'            # Ice Lake
+    return None, None, None
 
 device_props = {}
 extra_boot_args = ""
 if is_laptop and igpu_dev is not None:
-    platform_id, spoof = intel_framebuffer(igpu_dev)
+    platform_id, spoof, mem = intel_framebuffer(igpu_dev)
     if platform_id is None:
         extra_boot_args = " -igfxvesa"      # VESA fallback: unaccelerated but shows a picture
     else:
-        props = {"AAPL,ig-platform-id": platform_id,
-                 "framebuffer-patch-enable": b"\x01\x00\x00\x00",
-                 "framebuffer-stolenmem": b"\x00\x00\x30\x01",
-                 "framebuffer-fbmem": b"\x00\x00\x90\x00"}
+        props = {"AAPL,ig-platform-id": platform_id}
         if spoof is not None:
             props["device-id"] = spoof
+        if mem == 'stolenfb':
+            props["framebuffer-patch-enable"] = b"\x01\x00\x00\x00"
+            props["framebuffer-stolenmem"] = b"\x00\x00\x30\x01"
+            props["framebuffer-fbmem"] = b"\x00\x00\x90\x00"
+        elif mem == 'cursor':
+            props["framebuffer-patch-enable"] = b"\x01\x00\x00\x00"
+            props["framebuffer-cursormem"] = b"\x00\x00\x90\x00"
         device_props = {"PciRoot(0x0)/Pci(0x2,0x0)": props}
 
 boot_args = "-v keepsyms=1 debug=0x100" + extra_boot_args

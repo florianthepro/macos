@@ -1,4 +1,5 @@
 using MacOsUsbSetup.Core.Diagnostics;
+using MacOsUsbSetup.Core.Graphics;
 using MacOsUsbSetup.Core.Hardware;
 
 using static MacOsUsbSetup.Core.Compatibility.CompatibilityLevel;
@@ -108,7 +109,8 @@ public sealed class CompatibilityEvaluator : ICompatibilityEvaluator
             60 or 61 or 69 or 70 or 71 => ClassifyDim(darwin, 0, 24, 25, "Haswell/Broadwell: Tahoe nur experimentell", false),
             78 or 94 or 85 or 165 or 166 => ClassifyDim(darwin, 0, 25, 25, null, false),
             142 or 158 => ClassifyDim(darwin, 0, 25, 25, null, false),
-            140 or 141 => ClassifyDim(darwin, 0, 25, 25, "Ice/Tiger Lake: auf Desktop ggf. CPUFriend erforderlich", true),
+            125 or 126 => ClassifyDim(darwin, 0, 25, 25, "Ice Lake: auf Desktop ggf. CPUFriend erforderlich", true),
+            140 or 141 => ClassifyDim(darwin, 0, 25, 25, "Tiger Lake: auf Desktop ggf. CPUFriend erforderlich", true),
             151 or 154 or 183 => ClassifyDim(darwin, 0, -1, 25, "Hybrid-CPU: E-Cores ggf. deaktivieren", false),
             _ => ClassifyDim(darwin, 0, -1, 25, "Intel-CPU nicht klassifiziert", false)
         };
@@ -210,24 +212,12 @@ public sealed class CompatibilityEvaluator : ICompatibilityEvaluator
 
     private static (CompatibilityLevel Level, string? Note) EvaluateIntelGpu(int deviceId, int darwin)
     {
-        bool In(int lo, int hi) => deviceId >= lo && deviceId <= hi;
+        // Same catalog the EFI builder uses for the framebuffer, so tiles and boot config agree.
+        var entry = IntelIgpuCatalog.Lookup(deviceId);
+        if (entry is null)
+            return ClassifyDim(darwin, 0, -1, 25, "Intel-iGPU nicht klassifiziert - nur VESA (unbeschleunigt)", true);
 
-        if (In(0x0150, 0x016F))
-            return ClassifyDim(darwin, 0, 20, 20, "Intel HD 4000: maximal Big Sur", false);
-        if (In(0x0400, 0x0D3F) || In(0x1600, 0x163F))
-            return ClassifyDim(darwin, 0, 21, 21, "Intel HD 5000/Iris: maximal Monterey", false);
-        if (In(0x1900, 0x193F))
-            return ClassifyDim(darwin, 0, 21, 22, "Intel Skylake-iGPU: maximal Monterey", false);
-        if (In(0x5900, 0x593F))
-            return ClassifyDim(darwin, 0, 22, 23, "Intel Kaby-Lake-iGPU (HD/UHD 620/630): maximal Ventura", false);
-        if (In(0x3E00, 0x3EFF))
-            return ClassifyDim(darwin, 0, 22, 23, "Intel Coffee-Lake-iGPU (UHD 630): maximal Ventura", false);
-        if (In(0x9B00, 0x9BFF))
-            return ClassifyDim(darwin, 0, 23, 24, "Intel Comet-Lake-iGPU (UHD 630): maximal Sonoma", false);
-        if (In(0x8A50, 0x8A5F) || In(0x9A40, 0x9A7F))
-            return ClassifyDim(darwin, 0, -1, 25, "Intel Ice/Tiger Lake-iGPU: eingeschränkte Beschleunigung", true);
-
-        return ClassifyDim(darwin, 0, -1, 25, "Intel-iGPU nicht klassifiziert", true);
+        return ClassifyDim(darwin, 0, entry.MaxSupportedDarwin, entry.MaxExperimentalDarwin, entry.Note, false);
     }
 
     // --- shared classification --------------------------------------------
