@@ -198,6 +198,10 @@ public sealed class CompatibilityEvaluator : ICompatibilityEvaluator
     {
         bool In(int lo, int hi) => deviceId >= lo && deviceId <= hi;
 
+        // AMD APU integrated graphics (Raven Ridge/Picasso/Renoir/Cezanne/Rembrandt/Phoenix):
+        // no macOS driver exists, so a Ryzen laptop with only its iGPU has no usable graphics.
+        if (In(0x15D8, 0x15DF) || In(0x1636, 0x164F) || In(0x1680, 0x168F) || deviceId is 0x15BF or 0x15C8)
+            return (Unsupported, "AMD-APU-Grafik (Vega/RDNA integriert): keine macOS-Treiber");
         if (In(0x7440, 0x745F))
             return (Unsupported, "AMD Navi3x (RX 7000): keine Treiber");
         if (In(0x73A0, 0x743F))

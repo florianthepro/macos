@@ -180,7 +180,8 @@ gpu_adapter_window() {
       if (( dec >= 16#1340 )); then G_SUP=17; G_EXP=17; G_ALWAYS=1; G_NOTE="Nvidia: keine Treiber ab Mojave";
       else G_SUP=20; G_EXP=21; G_NOTE="Nvidia Kepler: maximal Big Sur"; fi ;;
     1002|1022)
-      if   (( dec >= 16#7440 && dec <= 16#745F )); then G_SUP=-1; G_EXP=-1; G_ALWAYS=1; G_NOTE="AMD Navi3x (RX 7000): keine Treiber"
+      if   (( (dec>=16#15D8 && dec<=16#15DF) || (dec>=16#1636 && dec<=16#164F) || (dec>=16#1680 && dec<=16#168F) || dec==16#15BF || dec==16#15C8 )); then G_SUP=-1; G_EXP=-1; G_ALWAYS=1; G_NOTE="AMD-APU-Grafik (Vega/RDNA integriert): keine macOS-Treiber"
+      elif (( dec >= 16#7440 && dec <= 16#745F )); then G_SUP=-1; G_EXP=-1; G_ALWAYS=1; G_NOTE="AMD Navi3x (RX 7000): keine Treiber"
       elif (( dec >= 16#73A0 && dec <= 16#743F )); then G_MIN=21; G_SUP=25; G_EXP=25; G_NOTE="AMD Navi2x (RX 6000): ab Monterey"
       elif (( dec >= 16#7310 && dec <= 16#739F )); then G_MIN=19; G_SUP=25; G_EXP=25; G_NOTE="AMD Navi1x (RX 5000): ab Catalina"
       elif (( (dec>=16#67C0 && dec<=16#67FF) || (dec>=16#6980 && dec<=16#699F) || (dec>=16#6860 && dec<=16#687F) || (dec>=16#69A0 && dec<=16#69AF) || (dec>=16#66A0 && dec<=16#66BF) )); then G_SUP=25; G_EXP=25
