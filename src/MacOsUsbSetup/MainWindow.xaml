@@ -10,10 +10,6 @@
         Foreground="{StaticResource Text.Primary}"
         FontFamily="Segoe UI" FontSize="13" UseLayoutRounding="True">
 
-    <Window.DataContext>
-        <app:WizardViewModel />
-    </Window.DataContext>
-
     <Window.Resources>
         <DataTemplate DataType="{x:Type vm:ScanViewModel}"><views:ScanView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:VersionViewModel}"><views:VersionView /></DataTemplate>

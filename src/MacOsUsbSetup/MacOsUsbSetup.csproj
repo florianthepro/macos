@@ -18,7 +18,10 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- WPF creates the UI CultureInfo (FrameworkElement.Language, default en-US) at render
+         time; globalization-invariant mode makes that throw CultureNotFoundException and the
+         window never appears. Keep full globalization. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
