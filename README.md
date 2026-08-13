@@ -52,6 +52,13 @@ Optionen (werden an `src\build.ps1` durchgereicht):
 - `build.bat -PayloadOnly` – nur die eingebettete EFI-Nutzlast neu bauen
 - `build.bat -SkipPayload` – mit vorhandener Nutzlast veröffentlichen
 
+## Gegenprüfung (optional)
+
+Nach dem Erstellen des Sticks prüft **`debug_test-usb.bat`** einmalig Gerät und
+USB und schreibt einen Report auf den Desktop mit **PASS/FAIL**: erwartete
+OpenCore-/EFI-Dateien, `com.apple.recovery.boot`, Gültigkeit der `config.plist`
+und die Programm-Logs. Braucht keine Administratorrechte.
+
 ## Linux: setup.sh
 
 Gleicher Ablauf als textbasiertes Werkzeug, ohne Bauen direkt ausführbar:
