@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Management;
 using System.Text;
 using MacOsUsbSetup.Core.Diagnostics;

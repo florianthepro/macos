@@ -58,8 +58,9 @@ function Resolve-Dotnet {
 
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         Write-Host 'dotnet nicht gefunden - .NET 8 SDK wird via winget installiert...'
+        # Pipe to Out-Host so winget's stdout is displayed, not returned as the path.
         winget install --id Microsoft.DotNet.SDK.8 -e --source winget `
-            --accept-package-agreements --accept-source-agreements
+            --accept-package-agreements --accept-source-agreements | Out-Host
         foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
     }
 
