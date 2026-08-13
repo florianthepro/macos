@@ -11,6 +11,8 @@ heruntergeladen oder aufgerufen. Extern sind nur die Daten selbst: die
 macOS-Recovery-Abbildungen von Apple sowie die OpenCore-/Kext-Binärdateien
 („EFIs"), die beim Bauen fest eingebunden werden.
 
+Für Linux gibt es dasselbe als Kommandozeilen-Werkzeug: **`setup.sh`**.
+
 ## Ablauf
 
 1. Start → Ladebalken während des Hardware-Scans
@@ -43,6 +45,20 @@ Optionen:
 
 - `./build.ps1 -PayloadOnly` – nur die eingebettete EFI-Nutzlast neu bauen
 - `./build.ps1 -SkipPayload` – mit vorhandener Nutzlast veröffentlichen
+
+## Linux: setup.sh
+
+Gleicher Ablauf als textbasiertes Werkzeug, ohne Bauen direkt ausführbar:
+
+```bash
+sudo ./setup.sh
+```
+
+Benötigt: `bash`, `curl`, `lsblk`, `lscpu`, `lspci`, `sgdisk` (gdisk),
+`mkfs.vfat` (dosfstools), `wipefs`/`partprobe` (util-linux), `unzip`, `python3`.
+Fehlt etwas, nennt das Skript die Pakete. OpenCore/Kexte und die
+macOS-Recovery werden zur Laufzeit von den offiziellen Quellen geladen; der
+erzeugte Stick ist identisch zu dem der `setup.exe`.
 
 ## Aufbau
 
