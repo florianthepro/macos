@@ -217,9 +217,13 @@ public sealed class CompatibilityEvaluator : ICompatibilityEvaluator
         if (In(0x0400, 0x0D3F) || In(0x1600, 0x163F))
             return ClassifyDim(darwin, 0, 21, 21, "Intel HD 5000/Iris: maximal Monterey", false);
         if (In(0x1900, 0x193F))
-            return ClassifyDim(darwin, 0, 21, 22, "Intel Skylake-iGPU: ab Ventura eingeschränkt", false);
-        if (In(0x5900, 0x593F) || In(0x3E00, 0x3EFF) || In(0x9B00, 0x9BFF))
-            return ClassifyDim(darwin, 0, 23, 25, "Intel UHD 600-Serie: ab Sequoia experimentell", false);
+            return ClassifyDim(darwin, 0, 21, 22, "Intel Skylake-iGPU: maximal Monterey", false);
+        if (In(0x5900, 0x593F))
+            return ClassifyDim(darwin, 0, 22, 23, "Intel Kaby-Lake-iGPU (HD/UHD 620/630): maximal Ventura", false);
+        if (In(0x3E00, 0x3EFF))
+            return ClassifyDim(darwin, 0, 22, 23, "Intel Coffee-Lake-iGPU (UHD 630): maximal Ventura", false);
+        if (In(0x9B00, 0x9BFF))
+            return ClassifyDim(darwin, 0, 23, 24, "Intel Comet-Lake-iGPU (UHD 630): maximal Sonoma", false);
         if (In(0x8A50, 0x8A5F) || In(0x9A40, 0x9A7F))
             return ClassifyDim(darwin, 0, -1, 25, "Intel Ice/Tiger Lake-iGPU: eingeschränkte Beschleunigung", true);
 

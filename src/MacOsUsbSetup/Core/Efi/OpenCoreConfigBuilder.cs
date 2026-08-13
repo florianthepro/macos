@@ -26,19 +26,22 @@ public sealed class OpenCoreConfigBuilder
     public Dictionary<string, object?> Build(HardwareInventory hardware, MacOsRelease release)
     {
         var isAmd = hardware.Processor.Vendor == CpuVendor.Amd;
+        var isLaptop = IsLaptop(hardware);
         var needsCurrentCpuInfo = isAmd || IsIntelHybrid(hardware.Processor);
 
         var kernel = BuildKernel(needsCurrentCpuInfo);
         if (isAmd)
             ApplyAmdPatches(kernel, hardware);
+        if (isLaptop && kernel["Add"] is object?[] baseKexts)
+            kernel["Add"] = baseKexts.Concat(LaptopInputKexts()).ToArray();
 
         var config = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["ACPI"] = BuildAcpi(),
+            ["ACPI"] = BuildAcpi(isLaptop),
             ["Booter"] = BuildBooter(),
             ["DeviceProperties"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["Add"] = new Dictionary<string, object?>(),
+                ["Add"] = BuildDeviceProperties(hardware, isLaptop),
                 ["Delete"] = new Dictionary<string, object?>(),
             },
             ["Kernel"] = kernel,
@@ -47,12 +50,16 @@ public sealed class OpenCoreConfigBuilder
             ["PlatformInfo"] = BuildPlatformInfo(hardware, release),
             ["UEFI"] = BuildUefi(),
         };
+        if (isLaptop)
+            Log.Info("Laptop erkannt: VoodooPS2 (Tastatur/Trackpad), SSDTs und iGPU-Framebuffer ergänzt.");
         return config;
     }
 
-    private static Dictionary<string, object?> BuildAcpi() => new(StringComparer.Ordinal)
+    private static Dictionary<string, object?> BuildAcpi(bool laptop) => new(StringComparer.Ordinal)
     {
-        ["Add"] = Array.Empty<object?>(),
+        ["Add"] = laptop
+            ? new object?[] { AcpiAdd("SSDT-EC-USBX-LAPTOP.aml"), AcpiAdd("SSDT-PLUG-DRTNIA.aml"), AcpiAdd("SSDT-PNLF.aml") }
+            : Array.Empty<object?>(),
         ["Delete"] = Array.Empty<object?>(),
         ["Patch"] = Array.Empty<object?>(),
         ["Quirks"] = D(
@@ -69,7 +76,9 @@ public sealed class OpenCoreConfigBuilder
             ("DisableSingleUser", false), ("DisableVariableWrite", false), ("DiscardHibernateMap", false),
             ("EnableSafeModeSlide", true), ("EnableWriteUnprotector", false), ("ForceBooterSignature", false),
             ("ForceExitBootServices", false), ("ProtectMemoryRegions", false), ("ProtectSecureBoot", false),
-            ("ProtectUefiServices", false), ("ProvideCustomSlide", true), ("ProvideMaxSlide", 0),
+            // ProtectUefiServices: needed on modern firmware that tampers with UEFI services;
+            // the common fix for a hang at ExitBootServices ([EB|LOG:EXITBS:START]).
+            ("ProtectUefiServices", true), ("ProvideCustomSlide", true), ("ProvideMaxSlide", 0),
             ("RebuildAppleMemoryMap", true), ("ResizeAppleGpuBars", -1), ("SetupVirtualMap", true),
             ("SignalAppleOS", false), ("SyncRuntimePermissions", true)),
     };
@@ -112,7 +121,8 @@ public sealed class OpenCoreConfigBuilder
             ("ShowPicker", true), ("TakeoffDelay", 0), ("Timeout", 10)),
         ["Debug"] = D(
             ("AppleDebug", true), ("ApplePanic", true), ("DisableWatchDog", true), ("DisplayDelay", 0),
-            ("DisplayLevel", 2147483650L), ("LogModules", "*"), ("SysReport", false), ("Target", 3)),
+            // Target 67 also writes opencore-*.txt to the USB root for diagnostics.
+            ("DisplayLevel", 2147483650L), ("LogModules", "*"), ("SysReport", false), ("Target", 67)),
         ["Entries"] = Array.Empty<object?>(),
         ["Security"] = D(
             ("AllowSetDefault", true), ("ApECID", 0), ("AuthRestart", false), ("BlacklistAppleUpdate", true),
@@ -254,10 +264,67 @@ public sealed class OpenCoreConfigBuilder
     private static Dictionary<string, object?> Driver(string path) => D(
         ("Arguments", ""), ("Comment", ""), ("Enabled", true), ("LoadEarly", false), ("Path", path));
 
-    private static string ChooseSmbios(HardwareInventory hardware, MacOsRelease release) =>
-        hardware.Processor.Vendor == CpuVendor.Amd
-            ? release.PreferredDesktopSmbios
-            : IsLaptop(hardware) ? release.PreferredLaptopSmbios : release.PreferredDesktopSmbios;
+    private static Dictionary<string, object?> AcpiAdd(string path) => D(
+        ("Comment", ""), ("Enabled", true), ("Path", path));
+
+    // VoodooPS2 controller + plugins: laptop keyboard/trackpad (PS/2), essential to
+    // navigate the installer without an external USB keyboard.
+    private static IEnumerable<object?> LaptopInputKexts() => new object?[]
+    {
+        Kext("VoodooPS2Controller.kext", "Contents/MacOS/VoodooPS2Controller"),
+        Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooInput.kext", "Contents/MacOS/VoodooInput"),
+        Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Keyboard.kext", "Contents/MacOS/VoodooPS2Keyboard"),
+        Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
+        Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
+    };
+
+    // Intel iGPU framebuffer for the internal laptop display, chosen by CPU generation.
+    private static Dictionary<string, object?> BuildDeviceProperties(HardwareInventory hardware, bool isLaptop)
+    {
+        var add = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (!isLaptop || hardware.Processor.Vendor != CpuVendor.Intel)
+            return add;
+
+        byte[]? platformId = null;
+        byte[]? deviceId = null;
+        switch (hardware.Processor.Model)
+        {
+            case 78 or 94: platformId = new byte[] { 0x00, 0x00, 0x16, 0x19 }; break;            // Skylake HD 5xx -> 0x19160000
+            case 142: platformId = new byte[] { 0x00, 0x00, 0x16, 0x59 }; deviceId = new byte[] { 0x16, 0x59, 0x00, 0x00 }; break; // Kaby Lake UHD 620
+            case 158 or 165 or 166:
+                platformId = new byte[] { 0x09, 0x00, 0xA5, 0x3E }; deviceId = new byte[] { 0xA5, 0x3E, 0x00, 0x00 }; break;      // Coffee/Comet Lake UHD 630
+        }
+        if (platformId is null)
+            return add;
+
+        var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["AAPL,ig-platform-id"] = platformId,
+            ["framebuffer-patch-enable"] = new byte[] { 0x01, 0x00, 0x00, 0x00 },
+        };
+        if (deviceId is not null)
+            properties["device-id"] = deviceId;
+
+        add["PciRoot(0x0)/Pci(0x2,0x0)"] = properties;
+        return add;
+    }
+
+    private static string ChooseSmbios(HardwareInventory hardware, MacOsRelease release)
+    {
+        if (hardware.Processor.Vendor == CpuVendor.Amd || !IsLaptop(hardware))
+            return release.PreferredDesktopSmbios;
+
+        // Laptop Intel: match a MacBookPro of the same CPU generation for power management.
+        return hardware.Processor.Model switch
+        {
+            78 or 94 => "MacBookPro13,1",       // Skylake
+            142 => "MacBookPro14,1",             // Kaby Lake (e.g. ThinkPad T480)
+            158 => "MacBookPro15,2",             // Coffee Lake
+            165 or 166 => "MacBookPro16,1",      // Comet Lake
+            140 or 141 => "MacBookPro16,2",      // Ice / Tiger Lake
+            _ => release.PreferredLaptopSmbios,
+        };
+    }
 
     private static bool IsLaptop(HardwareInventory hardware)
     {

@@ -105,6 +105,15 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
   gesetzt werden.
 - AMD-Ryzen wird über die AMD-Vanilla-Kernel-Patches unterstützt (automatisch
   auf die Kernanzahl gesetzt).
+- Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), die Basis-SSDTs
+  (EC/USBX, PLUG, PNLF), einen passenden MacBookPro-SMBIOS und die
+  iGPU-Framebuffer-ID. OpenCore schreibt zusätzlich ein Protokoll
+  (`opencore-*.txt`) auf den USB-Stick.
+- Intel-iGPUs (z. B. UHD 620 im ThinkPad T480) haben in neuen macOS-Versionen
+  keine Grafiktreiber mehr; die Kacheln zeigen daher die höchste sinnvolle
+  Version (bei Kaby Lake z. B. Ventura). Hängt der Bootvorgang bei
+  `[EB|LOG:EXITBS:START]`, ist das ein Speicher-/Firmware-Thema – eine ältere
+  Version (Ventura/Monterey) hilft am zuverlässigsten.
 - Wird der Stick im Boot-Menü nicht angezeigt: im Firmware-Setup CSM
   deaktivieren bzw. „UEFI USB" aktivieren.
 - Läuft ein Schritt auf einen Fehler, zeigt die Oberfläche eine fachliche

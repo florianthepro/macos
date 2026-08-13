@@ -21,7 +21,8 @@ param(
     [string]$OpenCoreVersion = '1.0.7',
     [string]$LiluVersion     = '1.7.1',
     [string]$VirtualSmcVersion = '1.3.7',
-    [string]$WhateverGreenVersion = '1.7.0'
+    [string]$WhateverGreenVersion = '1.7.0',
+    [string]$VoodooPS2Version = '2.3.7'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -113,6 +114,23 @@ function Build-Payload {
         Copy-Item $src.FullName (Join-Path $kexts $k.pick) -Recurse -Force
     }
 
+    # --- VoodooPS2 (laptop keyboard/trackpad); config references it only on laptops ---
+    $vpZip = Get-Release 'acidanthera/VoodooPS2' $VoodooPS2Version "VoodooPS2Controller-$VoodooPS2Version-RELEASE.zip" (Join-Path $cache 'voodoops2.zip')
+    $vpEx = Join-Path $cache 'voodoops2-x'
+    Expand-Into $vpZip $vpEx
+    $vpSrc = Get-ChildItem $vpEx -Recurse -Directory -Filter 'VoodooPS2Controller.kext' | Select-Object -First 1
+    if (-not $vpSrc) { throw 'VoodooPS2Controller.kext not found' }
+    Copy-Item $vpSrc.FullName (Join-Path $kexts 'VoodooPS2Controller.kext') -Recurse -Force
+
+    # --- Laptop SSDTs (EC+USBX, CPU power plug, backlight); referenced only on laptops ---
+    $acpiDir = Join-Path $ocRoot 'ACPI'
+    New-Item -ItemType Directory -Force -Path $acpiDir | Out-Null
+    $ssdtBase = 'https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled'
+    foreach ($ssdt in 'SSDT-EC-USBX-LAPTOP.aml', 'SSDT-PLUG-DRTNIA.aml', 'SSDT-PNLF.aml') {
+        Write-Host "  fetch SSDT $ssdt"
+        Invoke-WebRequest -UseBasicParsing -OutFile (Join-Path $acpiDir $ssdt) -Uri "$ssdtBase/$ssdt"
+    }
+
     # OpenCore ships a placeholder Sample config; setup.exe writes the real one.
     Get-ChildItem $ocRoot -Filter '*.plist' | Remove-Item -Force -ErrorAction SilentlyContinue
 
@@ -125,6 +143,7 @@ function Build-Payload {
         lilu          = $LiluVersion
         virtualSmc    = $VirtualSmcVersion
         whateverGreen = $WhateverGreenVersion
+        voodooPS2     = $VoodooPS2Version
     } | ConvertTo-Json
     Set-Content -Path (Join-Path $staging 'payload.json') -Value $manifest -Encoding UTF8
 
