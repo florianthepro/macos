@@ -44,7 +44,7 @@ public static class ChunklistVerifier
             throw new SetupException(
                 SetupStage.Verification,
                 "Recovery-Abbildung konnte nicht gelesen werden.",
-                "Download beschädigt – Setup erneut ausführen.",
+                "Download beschädigt - Setup erneut ausführen.",
                 ex);
         }
 
@@ -63,7 +63,7 @@ public static class ChunklistVerifier
             throw new SetupException(
                 SetupStage.Verification,
                 "Chunklist konnte nicht gelesen werden.",
-                "Download beschädigt – Setup erneut ausführen.",
+                "Download beschädigt - Setup erneut ausführen.",
                 ex);
         }
 
@@ -118,10 +118,10 @@ public static class ChunklistVerifier
     private static SetupException Corrupt() => new(
         SetupStage.Verification,
         "Prüfsumme der Recovery-Abbildung stimmt nicht.",
-        "Download beschädigt – Setup erneut ausführen.");
+        "Download beschädigt - Setup erneut ausführen.");
 
     private static SetupException InvalidChunklist() => new(
         SetupStage.Verification,
         "Chunklist der Recovery-Abbildung ist ungültig.",
-        "Download beschädigt – Setup erneut ausführen.");
+        "Download beschädigt - Setup erneut ausführen.");
 }

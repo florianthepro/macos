@@ -149,7 +149,7 @@ public sealed class OpenCoreConfigBuilder
     {
         var smbios = ChooseSmbios(hardware, release);
         Log.Info($"SMBIOS: {smbios} für macOS {release.Name}");
-        Log.Warn("Seriennummer/MLB sind Platzhalter – für iMessage/FaceTime später gültige Werte generieren.");
+        Log.Warn("Seriennummer/MLB sind Platzhalter - für iMessage/FaceTime später gültige Werte generieren.");
 
         return new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -216,14 +216,14 @@ public sealed class OpenCoreConfigBuilder
         var file = _assets.AmdPatchesFile;
         if (file is null)
         {
-            Log.Warn("AMD-Kernel-Patches nicht im Payload gefunden – EFI wird ohne sie geschrieben.");
+            Log.Warn("AMD-Kernel-Patches nicht im Payload gefunden - EFI wird ohne sie geschrieben.");
             return;
         }
 
         if (Plist.Read(File.ReadAllText(file)) is not IDictionary<string, object?> root ||
             root.TryGetValue("Kernel", out var kobj) is false || kobj is not IDictionary<string, object?> amdKernel)
         {
-            Log.Warn("AMD-Patchdatei hat ein unerwartetes Format – übersprungen.");
+            Log.Warn("AMD-Patchdatei hat ein unerwartetes Format - übersprungen.");
             return;
         }
 

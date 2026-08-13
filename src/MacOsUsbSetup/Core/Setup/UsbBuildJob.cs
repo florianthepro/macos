@@ -15,8 +15,8 @@ namespace MacOsUsbSetup.Core.Setup;
 public sealed class UsbBuildJob
 {
     private const double PrepareEnd  = 0.08;
-    private const double EfiEnd      = 0.15;
-    private const double LookupEnd   = 0.18;
+    private const double EfiEnd  = 0.15;
+    private const double LookupEnd  = 0.18;
     private const double DownloadEnd = 0.99;
 
     private readonly IDiskPreparer _preparer;
@@ -66,6 +66,6 @@ public sealed class UsbBuildJob
         });
         await _recovery.DownloadAsync(image, recoveryDir, downloadLog, ct);
 
-        Report(SetupStage.Verification, 1.0, "Fertig – der USB-Stick ist bootfähig.");
+        Report(SetupStage.Verification, 1.0, "Fertig - der USB-Stick ist bootfähig.");
     }
 }

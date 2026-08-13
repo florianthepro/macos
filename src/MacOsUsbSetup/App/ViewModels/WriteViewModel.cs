@@ -28,7 +28,7 @@ public sealed class WriteViewModel : ViewModelBase
     }
 
     public string Headline => "USB wird erstellt";
-    public string Target => $"macOS {_plan.Release.Name} ({_plan.Release.RecoveryVersion})  →  {_plan.Target.Model}";
+    public string Target => $"macOS {_plan.Release.Name} ({_plan.Release.RecoveryVersion})  ->  {_plan.Target.Model}";
     public ObservableCollection<string> Log { get; } = new();
     public RelayCommand CancelCommand { get; }
 
@@ -88,7 +88,7 @@ public sealed class WriteViewModel : ViewModelBase
         IsRunning = false;
         if (cancelled)
             Failed?.Invoke(new SetupException(SetupStage.UsbPreparation,
-                "Vorgang abgebrochen – der USB-Datenträger ist unvollständig und nicht bootfähig.",
+                "Vorgang abgebrochen - der USB-Datenträger ist unvollständig und nicht bootfähig.",
                 "Setup erneut ausführen, um den Stick vollständig zu beschreiben."));
         else if (failure is not null)
             Failed?.Invoke(failure);

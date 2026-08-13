@@ -1,25 +1,24 @@
+using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
-using System.Management;
 using System.Text;
 using MacOsUsbSetup.Core.Diagnostics;
 
 namespace MacOsUsbSetup.Core.Usb;
 
 /// <summary>
-/// Wipes a USB disk and lays down a single bootable FAT32 volume via diskpart
-/// scripting. FAT32 through diskpart is capped at 32 GB, so oversized sticks get
-/// a 32 GB partition and leave the remainder unallocated (sufficient for an
-/// installer). All faults surface as <see cref="SetupException"/>.
+/// Wipes a USB disk and lays down a single bootable FAT32 volume. Any prior
+/// format is removed by diskpart's <c>clean</c>, then an MBR primary FAT32
+/// partition is created (removable UEFI media boots from EFI\BOOT\BOOTx64.efi
+/// regardless of MBR/GPT, and MBR avoids the convert-gpt failure on flash
+/// drives). diskpart runs elevated so the app itself needs no admin rights.
 /// </summary>
 public sealed class DiskPreparer : IDiskPreparer
 {
     private const string VolumeLabel = "MACOS-USB";
-    private const ulong MinimumSizeBytes = 7_000_000_000;
+    private const ulong MinimumSizeBytes = 8_000_000_000;
     private const ulong Fat32CapBytes = 32_000_000_000;
     private const int Fat32PartitionSizeMb = 32000;
-    private const string StorageScope = @"\\.\root\Microsoft\Windows\Storage";
 
     public async Task<PreparedVolume> PrepareAsync(UsbDisk disk, IProgress<string> log, CancellationToken ct)
     {
@@ -31,171 +30,100 @@ public sealed class DiskPreparer : IDiskPreparer
     {
         if (disk.IsSystemDisk)
             throw new SetupException(SetupStage.UsbPreparation, "Der Systemdatenträger kann nicht verwendet werden.");
-
         if (disk.BusType != "USB" && !disk.IsRemovable)
             throw new SetupException(SetupStage.UsbPreparation, "Nur USB-Datenträger sind zugelassen.");
-
         if (disk.SizeBytes < MinimumSizeBytes)
-            throw new SetupException(SetupStage.UsbPreparation, "USB-Datenträger zu klein (mindestens 8 GB erforderlich).");
+            throw new SetupException(SetupStage.UsbPreparation,
+                $"USB-Datenträger zu klein ({disk.SizeGigabytes:0.#} GB). Mindestens 8 GB erforderlich.");
     }
 
     private static PreparedVolume Prepare(UsbDisk disk, IProgress<string> log, CancellationToken ct)
     {
-        Log.Info($"USB-Datenträger {disk.DiskNumber} wird vorbereitet ({disk.Model}, {disk.SizeGigabytes:0.#} GB).");
+        Log.Info($"USB {disk.DiskNumber} wird vorbereitet ({disk.Model}, {disk.SizeGigabytes:0.#} GB).");
+        log.Report("USB-Datenträger wird formatiert (FAT32)");
+        RunDiskpart(disk, ct);
 
-        RunDiskpart(disk, log, ct);
-
-        var letter = ResolveDriveLetter(disk.DiskNumber, ct);
-        log.Report($"Laufwerk {letter}: zugewiesen.");
-        Log.Info($"USB-Datenträger {disk.DiskNumber} formatiert, Laufwerk {letter}:.");
-
-        return new PreparedVolume($"{letter}:\\", VolumeLabel, disk.DiskNumber);
+        var root = ResolveVolumeRoot(ct);
+        log.Report($"Volume bereit: {root}");
+        Log.Info($"USB {disk.DiskNumber} formatiert: {root}");
+        return new PreparedVolume(root, VolumeLabel, disk.DiskNumber);
     }
 
-    private static void RunDiskpart(UsbDisk disk, IProgress<string> log, CancellationToken ct)
+    private static void RunDiskpart(UsbDisk disk, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-
-        var scriptPath = Path.Combine(Path.GetTempPath(), $"macos-usb-diskpart-{Guid.NewGuid():N}.txt");
+        var script = Path.Combine(Path.GetTempPath(), $"macos-usb-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(script, BuildScript(disk), new UTF8Encoding(false));
         try
         {
-            File.WriteAllText(scriptPath, BuildScript(disk), new UTF8Encoding(false));
-
-            log.Report($"Datenträger {disk.DiskNumber} wird bereinigt.");
-            log.Report("GPT-Partitionstabelle wird angelegt.");
-            log.Report($"FAT32-Partition wird erstellt und als \"{VolumeLabel}\" formatiert.");
-
-            var (exitCode, output) = Execute(scriptPath, ct);
-
-            if (exitCode != 0 || ContainsError(output))
+            var info = new ProcessStartInfo
             {
-                Log.Error($"diskpart schlug fehl (Exit {exitCode}): {output}");
-                throw new SetupException(
-                    SetupStage.UsbPreparation,
-                    output.Trim().Length == 0 ? $"diskpart beendet mit Code {exitCode}." : output.Trim(),
-                    "USB-Datenträger neu einstecken und Setup als Administrator starten.");
+                FileName = "diskpart.exe",
+                Arguments = $"/s \"{script}\"",
+                UseShellExecute = true,          // required to elevate
+                Verb = "runas",                  // request admin for this step only
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+
+            Process process;
+            try
+            {
+                process = Process.Start(info) ?? throw new SetupException(
+                    SetupStage.UsbPreparation, "diskpart konnte nicht gestartet werden.");
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED
+            {
+                throw new SetupException(SetupStage.UsbPreparation,
+                    "Administratorrechte wurden abgelehnt.",
+                    "Zum Formatieren des USB-Datenträgers bei der Windows-Abfrage auf Ja klicken.");
             }
 
-            log.Report("Formatierung abgeschlossen.");
+            process.WaitForExit();
+            Log.Info($"diskpart beendet (Code {process.ExitCode}).");
         }
         finally
         {
-            try { File.Delete(scriptPath); }
-            catch (Exception ex) { Log.Warn($"diskpart-Skript konnte nicht gelöscht werden: {ex.Message}"); }
+            try { File.Delete(script); } catch { /* temp cleanup is best-effort */ }
         }
     }
 
     private static string BuildScript(UsbDisk disk)
     {
-        var createPartition = disk.SizeBytes <= Fat32CapBytes
+        var create = disk.SizeBytes <= Fat32CapBytes
             ? "create partition primary"
             : $"create partition primary size={Fat32PartitionSizeMb}";
 
-        var builder = new StringBuilder();
-        builder.AppendLine($"select disk {disk.DiskNumber}");
-        builder.AppendLine("clean");
-        builder.AppendLine("convert gpt");
-        builder.AppendLine(createPartition);
-        builder.AppendLine($"format fs=fat32 quick label=\"{VolumeLabel}\"");
-        builder.AppendLine("assign");
-        return builder.ToString();
+        var script = new StringBuilder();
+        script.AppendLine($"select disk {disk.DiskNumber}");
+        script.AppendLine("clean");
+        script.AppendLine(create);
+        script.AppendLine("active");
+        script.AppendLine($"format fs=fat32 quick label=\"{VolumeLabel}\"");
+        script.AppendLine("assign");
+        return script.ToString();
     }
 
-    private static (int ExitCode, string Output) Execute(string scriptPath, CancellationToken ct)
+    // Locate the freshly formatted volume by its label. Uses DriveInfo (no elevation
+    // and no admin-only Storage WMI), so it works from the non-elevated app.
+    private static string ResolveVolumeRoot(CancellationToken ct)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "diskpart.exe",
-            Arguments = $"/s \"{scriptPath}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
-
-        try
-        {
-            using var process = Process.Start(startInfo)
-                ?? throw new SetupException(
-                    SetupStage.UsbPreparation,
-                    "diskpart.exe konnte nicht gestartet werden.",
-                    "USB-Datenträger neu einstecken und Setup als Administrator starten.");
-
-            var stdout = process.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-
-            var output = string.Concat(stdout, stderr).Trim();
-            return (process.ExitCode, output);
-        }
-        catch (SetupException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new SetupException(
-                SetupStage.UsbPreparation,
-                "diskpart konnte nicht ausgeführt werden.",
-                "USB-Datenträger neu einstecken und Setup als Administrator starten.",
-                ex);
-        }
-    }
-
-    private static char ResolveDriveLetter(int diskNumber, CancellationToken ct)
-    {
-        const int attempts = 10;
-        for (var attempt = 0; attempt < attempts; attempt++)
+        for (var attempt = 0; attempt < 20; attempt++)
         {
             ct.ThrowIfCancellationRequested();
-
-            var letter = QueryDriveLetter(diskNumber);
-            if (letter != '\0')
-                return letter;
-
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (drive.IsReady && string.Equals(drive.VolumeLabel, VolumeLabel, StringComparison.OrdinalIgnoreCase))
+                        return drive.RootDirectory.FullName;
+                }
+                catch { /* drive not mounted yet */ }
+            }
             Thread.Sleep(500);
         }
 
-        throw new SetupException(
-            SetupStage.UsbPreparation,
-            "Formatiertes Volume wurde nicht gefunden.",
-            "USB neu verbinden.");
+        throw new SetupException(SetupStage.UsbPreparation,
+            "USB-Datenträger konnte nicht formatiert werden.",
+            "Anderen USB-Anschluss oder Datenträger verwenden und Setup erneut ausführen.");
     }
-
-    private static char QueryDriveLetter(int diskNumber)
-    {
-        try
-        {
-            var scope = new ManagementScope(StorageScope);
-            scope.Connect();
-
-            var query = new ObjectQuery(
-                $"SELECT DriveLetter FROM MSFT_Partition WHERE DiskNumber = {diskNumber}");
-
-            using var searcher = new ManagementObjectSearcher(scope, query);
-
-            foreach (var partition in searcher.Get().Cast<ManagementObject>())
-            {
-                var value = partition["DriveLetter"];
-                if (value is null)
-                    continue;
-
-                var letter = (char)Convert.ToUInt16(value, CultureInfo.InvariantCulture);
-                if (letter != '\0')
-                    return letter;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"Laufwerksbuchstabe konnte nicht abgefragt werden: {ex.Message}");
-        }
-
-        return '\0';
-    }
-
-    private static bool ContainsError(string output) =>
-        output.Contains("error", StringComparison.OrdinalIgnoreCase)
-        || output.Contains("Fehler", StringComparison.OrdinalIgnoreCase);
 }

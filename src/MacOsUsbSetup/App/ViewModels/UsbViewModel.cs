@@ -51,7 +51,7 @@ public sealed class UsbTileViewModel : ViewModelBase
     {
         Disk = disk;
         Model = string.IsNullOrWhiteSpace(disk.Model) ? "USB-Datenträger" : disk.Model.Trim();
-        Details = $"{disk.SizeGigabytes:0.#} GB  ·  {disk.BusType}";
+        Details = $"{disk.SizeGigabytes:0.#} GB  -  {disk.BusType}";
         SelectCommand = new RelayCommand(_ => onSelect(disk));
     }
 

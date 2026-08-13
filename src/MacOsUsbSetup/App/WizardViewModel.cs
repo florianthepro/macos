@@ -8,7 +8,7 @@ using MacOsUsbSetup.Core.Setup;
 
 namespace MacOsUsbSetup.App;
 
-/// <summary>Drives the linear flow scan → version → USB → write → done, plus the error page.</summary>
+/// <summary>Drives the linear flow scan -> version -> USB -> write -> done, plus the error page.</summary>
 public sealed class WizardViewModel : ViewModelBase
 {
     private readonly SetupServices _services = new();

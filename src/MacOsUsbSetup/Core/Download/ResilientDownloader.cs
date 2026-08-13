@@ -128,7 +128,7 @@ public sealed class ResilientDownloader
     {
         var code = (int)status;
         var remedy = code is 401 or 403
-            ? "Sitzungstoken abgelaufen – Setup erneut ausführen."
+            ? "Sitzungstoken abgelaufen - Setup erneut ausführen."
             : "Verbindung und macOS-Auswahl prüfen, dann Setup erneut ausführen.";
         return new SetupException(
             SetupStage.RecoveryDownload,

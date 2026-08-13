@@ -2,11 +2,12 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="MacOsUsbSetup" />
 
-  <!-- Partitioning and writing a raw USB disk requires administrative rights. -->
+  <!-- Run without elevation; the app requests admin only for the diskpart step
+       (via a runas child process), so browsing versions needs no UAC prompt. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

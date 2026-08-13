@@ -27,7 +27,7 @@ Für Linux gibt es dasselbe als Kommandozeilen-Werkzeug: **`setup.sh`**.
 - Windows 10/11 x64
 - .NET SDK 8 (nur zum Bauen; wird sonst automatisch per `winget` installiert)
 - PowerShell 5.1+ (in Windows enthalten)
-- Administratorrechte zur Laufzeit (Partitionieren/Formatieren)
+- Das Programm fragt beim Formatieren selbst nach Administratorrechten (UAC)
 - Internetverbindung beim ersten Lauf (Apple-Recovery-Download)
 
 ## Bauen (Windows)
@@ -80,7 +80,7 @@ erzeugte Stick ist identisch zu dem der `setup.exe`.
 
 ## Erzeugter USB-Stick
 
-- Eine FAT32-Partition (GPT), UEFI-bootfähig
+- Eine FAT32-Partition (MBR), UEFI-bootfähig (bootet über EFI\BOOT\BOOTx64.efi)
 - `EFI/` mit OpenCore, `OpenRuntime.efi`, `HfsPlus.efi` und den Basis-Kexts
 - `EFI/OC/config.plist`, erzeugt für die erkannte Hardware
 - `com.apple.recovery.boot/` mit `BaseSystem.dmg` + `BaseSystem.chunklist`
