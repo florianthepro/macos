@@ -79,7 +79,9 @@ public sealed class OpenCoreConfigBuilder
             // ProtectUefiServices: needed on modern firmware that tampers with UEFI services;
             // the common fix for a hang at ExitBootServices ([EB|LOG:EXITBS:START]).
             ("ProtectUefiServices", true), ("ProvideCustomSlide", true), ("ProvideMaxSlide", 0),
-            ("RebuildAppleMemoryMap", true), ("ResizeAppleGpuBars", -1), ("SetupVirtualMap", true),
+            // RebuildAppleMemoryMap=false is the modern default and the standard fix for a hang
+            // at ExitBootServices; SetupVirtualMap + SyncRuntimePermissions cover the memory map.
+            ("RebuildAppleMemoryMap", false), ("ResizeAppleGpuBars", -1), ("SetupVirtualMap", true),
             ("SignalAppleOS", false), ("SyncRuntimePermissions", true)),
     };
 
