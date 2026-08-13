@@ -178,17 +178,24 @@ public sealed class OpenCoreConfigBuilder
     {
         var smbios = ChooseSmbios(hardware, release);
         Log.Info($"SMBIOS: {smbios} für macOS {release.Name}");
-        Log.Warn("Seriennummer/MLB sind Platzhalter - für iMessage/FaceTime später gültige Werte generieren.");
+
+        var pair = _assets.MacserialFile is { } exe ? MacSerial.Generate(exe, smbios) : null;
+        var serial = pair?.Serial ?? RandomAlphanumeric(12);
+        var mlb = pair?.Mlb ?? RandomAlphanumeric(17);
+        if (pair is null)
+            Log.Warn("Seriennummer/MLB sind Platzhalter (macserial nicht verfügbar) - iMessage/FaceTime ggf. nicht möglich.");
+        else
+            Log.Info("Gültige SMBIOS-Seriennummer erzeugt (macserial) - für iMessage/FaceTime vorbereitet.");
 
         return new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["Automatic"] = true,
             ["CustomMemory"] = false,
             ["Generic"] = D(
-                ("AdviseFeatures", false), ("MLB", RandomAlphanumeric(17)), ("MaxBIOSVersion", false),
+                ("AdviseFeatures", false), ("MLB", mlb), ("MaxBIOSVersion", false),
                 ("ProcessorType", 0), ("ROM", RandomBytes(6)), ("SpoofVendor", true),
                 ("SystemMemoryStatus", "Auto"), ("SystemProductName", smbios),
-                ("SystemSerialNumber", RandomAlphanumeric(12)), ("SystemUUID", Guid.NewGuid().ToString().ToUpperInvariant())),
+                ("SystemSerialNumber", serial), ("SystemUUID", Guid.NewGuid().ToString().ToUpperInvariant())),
             ["UpdateDataHub"] = true,
             ["UpdateNVRAM"] = true,
             ["UpdateSMBIOS"] = true,

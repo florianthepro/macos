@@ -88,6 +88,12 @@ function Build-Payload {
     Copy-Item (Join-Path $ocDir 'X64/EFI/BOOT') (Join-Path $efi 'BOOT') -Recurse -Force
     Copy-Item (Join-Path $ocDir 'X64/EFI/OC')   (Join-Path $efi 'OC')   -Recurse -Force
 
+    # macserial (OpenCorePkg utility) -> payload root, so setup.exe can mint a valid,
+    # model-correct SMBIOS serial at runtime (prerequisite for iMessage/FaceTime).
+    $macserial = Join-Path $ocDir 'Utilities/macserial/macserial.exe'
+    if (Test-Path $macserial) { Copy-Item $macserial (Join-Path $staging 'macserial.exe') -Force }
+    else { Write-Warning 'macserial.exe not found in OpenCore package' }
+
     $ocRoot   = Join-Path $efi 'OC'
     $drivers  = Join-Path $ocRoot 'Drivers'
     $kexts    = Join-Path $ocRoot 'Kexts'

@@ -482,7 +482,22 @@ generate_config() {
   local is_amd=0; [[ "$CPU_VENDOR" == "amd" ]] && is_amd=1
   local igpu_dev=""; [[ "$IS_LAPTOP" -eq 1 && "$CPU_VENDOR" == "intel" ]] && igpu_dev="$INTEL_IGPU_DEV"
 
-  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" "$CPU_VENDOR" "$CPU_MODEL" "$sel_darwin" <<'PY'
+  # Gueltige, modellrichtige Seriennummer/MLB fuer iMessage/FaceTime (macserial aus OpenCorePkg).
+  local msname gen_serial="" gen_mlb=""
+  [[ "$(uname)" == "Darwin" ]] && msname="macserial" || msname="macserial.linux"
+  local ms; ms=$(find "$WORK/oc/Utilities/macserial" -maxdepth 1 -type f -name "$msname" 2>/dev/null | head -n1)
+  if [[ -n "$ms" ]]; then
+    chmod +x "$ms" 2>/dev/null || true
+    local pair; pair=$("$ms" -m "$smbios" --num 1 2>/dev/null | grep -m1 '|' || true)
+    if [[ -n "$pair" ]]; then
+      gen_serial="${pair%%|*}"; gen_serial="${gen_serial// /}"
+      gen_mlb="${pair##*|}";   gen_mlb="${gen_mlb// /}"
+    fi
+  fi
+  if [[ -n "$gen_serial" ]]; then info "Gueltige SMBIOS-Seriennummer erzeugt (macserial)"
+  else warn "macserial nicht verfuegbar - Platzhalter-Serien (iMessage ggf. nicht moeglich)"; fi
+
+  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" "$CPU_VENDOR" "$CPU_MODEL" "$sel_darwin" "$gen_serial" "$gen_mlb" <<'PY'
 import sys, secrets, plistlib
 
 out, smbios, is_amd, cores, amd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", int(sys.argv[4]), sys.argv[5]
@@ -491,6 +506,8 @@ igpu_dev = int(sys.argv[7], 16) if len(sys.argv) > 7 and sys.argv[7] else None
 cpu_intel = len(sys.argv) > 8 and sys.argv[8] == "intel"
 cpu_model = int(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9] else 0
 sel_darwin = int(sys.argv[10]) if len(sys.argv) > 10 and sys.argv[10] else 0
+gen_serial = sys.argv[11] if len(sys.argv) > 11 and sys.argv[11] else ""
+gen_mlb = sys.argv[12] if len(sys.argv) > 12 and sys.argv[12] else ""
 
 # CFG Lock (locked MSR 0xE2) panics macOS early on most stock laptop firmware; patch the
 # write out. Haswell+ uses native XCPM, Sandy/Ivy and older the legacy path.
@@ -639,10 +656,11 @@ config = {
                          "4D1EDE05-38C7-4A6A-9CC6-4BCCA8B38C14": ["DefaultBackgroundColor", "UIScale"]},
               "LegacyEnable": False, "LegacySchema": {}, "WriteFlash": True},
     "PlatformInfo": {"Automatic": True, "CustomMemory": False,
-                     "Generic": {"AdviseFeatures": False, "MLB": secrets.token_hex(8).upper()[:17].ljust(17, "0"),
+                     "Generic": {"AdviseFeatures": False,
+                                 "MLB": gen_mlb or secrets.token_hex(8).upper()[:17].ljust(17, "0"),
                                  "MaxBIOSVersion": False, "ProcessorType": 0, "ROM": secrets.token_bytes(6),
                                  "SpoofVendor": True, "SystemMemoryStatus": "Auto", "SystemProductName": smbios,
-                                 "SystemSerialNumber": secrets.token_hex(6).upper(),
+                                 "SystemSerialNumber": gen_serial or secrets.token_hex(6).upper(),
                                  "SystemUUID": str(__import__("uuid").uuid4()).upper()},
                      "UpdateDataHub": True, "UpdateNVRAM": True, "UpdateSMBIOS": True,
                      "UpdateSMBIOSMode": "Create", "UseRawUuidEncoding": False},

@@ -35,6 +35,16 @@ public sealed class EfiAssets
         }
     }
 
+    /// <summary>Bundled macserial.exe (OpenCorePkg) for valid iMessage-capable serials; null when absent.</summary>
+    public string? MacserialFile
+    {
+        get
+        {
+            var path = Path.Combine(_root.Value, "macserial.exe");
+            return File.Exists(path) ? path : null;
+        }
+    }
+
     private static string Extract()
     {
         var assembly = Assembly.GetExecutingAssembly();
