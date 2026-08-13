@@ -1,0 +1,17 @@
+Assembling EFI payload from upstream releases...
+  fetch acidanthera/OpenCorePkg 1.0.7 -> OpenCore-1.0.7-RELEASE.zip
+  fetch acidanthera/Lilu 1.7.1 -> Lilu-1.7.1-RELEASE.zip                                                                  fetch acidanthera/VirtualSMC 1.3.7 -> VirtualSMC-1.3.7-RELEASE.zip                                                      fetch acidanthera/WhateverGreen 1.7.0 -> WhateverGreen-1.7.0-RELEASE.zip                                              EFI payload written: C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\src\MacOsUsbSetup\Assets\efi-payload.zip
+Publishing setup.exe (dotnet: C:\Program Files\dotnet\dotnet.exe)...
+  Wiederherzustellende Projekte werden ermittelt...
+  "C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\src\MacOsUsbSetup\MacOsUsbSetup.csproj" wiederhergestellt (in
+  317 ms.).
+  MacOsUsbSetup -> C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\src\MacOsUsbSetup\bin\Release\net8.0-windows\w
+  in-x64\setup.dll
+  MacOsUsbSetup -> C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\publish\
+Fertig: C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\publish\setup.exe
+
+Fertig. setup.exe liegt unter:
+  "C:\Users\Win11 Pro\Downloads\macos-main(1)\macos-main\publish\setup.exe"
+Diese Datei kannst du jetzt manuell hochladen.
+Drücken Sie eine beliebige Taste . . .
+
