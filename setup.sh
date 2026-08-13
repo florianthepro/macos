@@ -12,6 +12,7 @@ OC_VERSION="1.0.7"
 LILU_VERSION="1.7.1"
 VSMC_VERSION="1.3.7"
 WEG_VERSION="1.7.0"
+VOODOOPS2_VERSION="2.3.7"
 
 readonly OSRECOVERY="http://osrecovery.apple.com"
 readonly UA="InternetRecovery/1.0"
@@ -80,8 +81,8 @@ require_tools() {
 # ---------------------------------------------------------------- Hardware-Scan
 
 CPU_VENDOR=""; CPU_FAMILY=0; CPU_MODEL=0; CPU_CORES=1; CPU_BRAND=""
-GPU_VEN=(); GPU_DEV=(); HAS_INTEL_IGPU=0; HAS_MODERN_NVIDIA=0
-FIRMWARE="unknown"; MEM_BYTES=0
+GPU_VEN=(); GPU_DEV=(); HAS_INTEL_IGPU=0; HAS_MODERN_NVIDIA=0; INTEL_IGPU_DEV=""
+FIRMWARE="unknown"; MEM_BYTES=0; IS_LAPTOP=0
 
 scan_hardware() {
   step "Hardware wird analysiert"
@@ -112,9 +113,14 @@ scan_hardware() {
     ven=${ven,,}; dev=${dev,,}
     GPU_VEN+=("$ven"); GPU_DEV+=("$dev")
     info "GPU: [$ven:$dev] ${line#*: }"
-    [[ "$ven" == "8086" ]] && HAS_INTEL_IGPU=1
+    if [[ "$ven" == "8086" ]]; then HAS_INTEL_IGPU=1; [[ -z "$INTEL_IGPU_DEV" ]] && INTEL_IGPU_DEV="$dev"; fi
     if [[ "$ven" == "10de" && $((16#$dev)) -ge $((16#1340)) ]]; then HAS_MODERN_NVIDIA=1; fi
   done < <(lspci -nn | grep -iE 'VGA compatible controller|3D controller|Display controller')
+
+  local chassis="" ; [[ -r /sys/class/dmi/id/chassis_type ]] && chassis=$(cat /sys/class/dmi/id/chassis_type)
+  if [[ "$chassis" =~ ^(8|9|10|11|14|30|31|32)$ ]] || [[ "$CPU_BRAND" =~ [0-9]{3,5}[[:space:]]*(U|H|HQ|HK|HX|HS|Y|MQ|G7)\b ]]; then
+    IS_LAPTOP=1
+  fi
 
   [[ -d /sys/firmware/efi ]] && FIRMWARE="uefi" || FIRMWARE="legacy"
   info "Firmware: ${FIRMWARE}"
@@ -181,8 +187,10 @@ gpu_adapter_window() {
     8086)
       if   (( dec >= 16#0150 && dec <= 16#016F )); then G_SUP=20; G_EXP=20; G_NOTE="Intel HD 4000: maximal Big Sur"
       elif (( (dec>=16#0400 && dec<=16#0D3F) || (dec>=16#1600 && dec<=16#163F) )); then G_SUP=21; G_EXP=21; G_NOTE="Intel HD 5000/Iris: maximal Monterey"
-      elif (( dec >= 16#1900 && dec <= 16#193F )); then G_SUP=21; G_EXP=22; G_NOTE="Intel Skylake-iGPU: ab Ventura eingeschraenkt"
-      elif (( (dec>=16#5900 && dec<=16#593F) || (dec>=16#3E00 && dec<=16#3EFF) || (dec>=16#9B00 && dec<=16#9BFF) )); then G_SUP=23; G_EXP=25; G_NOTE="Intel UHD 600-Serie: ab Sequoia experimentell"
+      elif (( dec >= 16#1900 && dec <= 16#193F )); then G_SUP=21; G_EXP=22; G_NOTE="Intel Skylake-iGPU: maximal Monterey"
+      elif (( dec >= 16#5900 && dec <= 16#593F )); then G_SUP=22; G_EXP=23; G_NOTE="Intel Kaby-Lake-iGPU (HD/UHD 620/630): maximal Ventura"
+      elif (( dec >= 16#3E00 && dec <= 16#3EFF )); then G_SUP=22; G_EXP=23; G_NOTE="Intel Coffee-Lake-iGPU (UHD 630): maximal Ventura"
+      elif (( dec >= 16#9B00 && dec <= 16#9BFF )); then G_SUP=23; G_EXP=24; G_NOTE="Intel Comet-Lake-iGPU (UHD 630): maximal Sonoma"
       elif (( (dec>=16#8A50 && dec<=16#8A5F) || (dec>=16#9A40 && dec<=16#9A7F) )); then G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Intel Ice/Tiger Lake-iGPU: eingeschraenkt"
       else G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Intel-iGPU nicht klassifiziert"; fi ;;
     *) G_SUP=-1; G_EXP=25; G_ALWAYS=1; G_NOTE="Grafik-Hersteller unbekannt" ;;
@@ -353,6 +361,22 @@ assemble_efi() {
     cp -r "$src" "$kexts/${nm}.kext"
   done
 
+  if [[ "$IS_LAPTOP" -eq 1 ]]; then
+    info "VoodooPS2 ${VOODOOPS2_VERSION} wird geladen (Tastatur/Trackpad)"
+    fetch "https://github.com/acidanthera/VoodooPS2/releases/download/${VOODOOPS2_VERSION}/VoodooPS2Controller-${VOODOOPS2_VERSION}-RELEASE.zip" "$WORK/VoodooPS2.zip"
+    unzip -q "$WORK/VoodooPS2.zip" -d "$WORK/VoodooPS2"
+    local vps; vps=$(find "$WORK/VoodooPS2" -maxdepth 3 -type d -name 'VoodooPS2Controller.kext' | head -n1)
+    [[ -n "$vps" ]] || die EFI "VoodooPS2Controller.kext nicht gefunden." "Erneut versuchen."
+    cp -r "$vps" "$kexts/VoodooPS2Controller.kext"
+
+    info "Laptop-SSDTs werden geladen (EC/USBX, PLUG, PNLF)"
+    mkdir -p "$efi/OC/ACPI"
+    local ssdt ssdtbase="https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled"
+    for ssdt in SSDT-EC-USBX-LAPTOP.aml SSDT-PLUG-DRTNIA.aml SSDT-PNLF.aml; do
+      fetch "${ssdtbase}/${ssdt}" "$efi/OC/ACPI/${ssdt}"
+    done
+  fi
+
   local amd="$WORK/amd-patches.plist"
   if [[ "$CPU_VENDOR" == "amd" ]]; then
     info "AMD-Vanilla-Kernel-Patches werden geladen"
@@ -372,17 +396,29 @@ generate_config() {
   local out=$1 amd=$2
   local rec smbios_desktop smbios_laptop smbios
   IFS=: read -r _ _ _ _ _ _ smbios_desktop smbios_laptop <<<"$SELECTED_RELEASE"
-  local chassis="" ; [[ -r /sys/class/dmi/id/chassis_type ]] && chassis=$(cat /sys/class/dmi/id/chassis_type)
-  if [[ "$CPU_VENDOR" == "amd" ]]; then smbios="$smbios_desktop"
-  elif [[ "$chassis" =~ ^(8|9|10|11|14|30|31|32)$ ]]; then smbios="$smbios_laptop"
-  else smbios="$smbios_desktop"; fi
+  if [[ "$CPU_VENDOR" == "amd" || "$IS_LAPTOP" -ne 1 ]]; then
+    smbios="$smbios_desktop"
+  elif [[ "$CPU_VENDOR" == "intel" ]]; then
+    # Match a MacBookPro of the same CPU generation for power management.
+    case "$CPU_MODEL" in
+      78|94)   smbios="MacBookPro13,1" ;;   # Skylake
+      142)     smbios="MacBookPro14,1" ;;   # Kaby Lake (e.g. ThinkPad T480)
+      158)     smbios="MacBookPro15,2" ;;   # Coffee Lake
+      165|166) smbios="MacBookPro16,1" ;;   # Comet Lake
+      140|141) smbios="MacBookPro16,2" ;;   # Ice / Tiger Lake
+      *)       smbios="$smbios_laptop" ;;
+    esac
+  else smbios="$smbios_laptop"; fi
 
   local is_amd=0; [[ "$CPU_VENDOR" == "amd" ]] && is_amd=1
+  local igpu_dev=""; [[ "$IS_LAPTOP" -eq 1 && "$CPU_VENDOR" == "intel" ]] && igpu_dev="$INTEL_IGPU_DEV"
 
-  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" <<'PY'
+  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" <<'PY'
 import sys, secrets, plistlib
 
 out, smbios, is_amd, cores, amd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", int(sys.argv[4]), sys.argv[5]
+is_laptop = sys.argv[6] == "1"
+igpu_dev = int(sys.argv[7], 16) if len(sys.argv) > 7 and sys.argv[7] else None
 
 def kext(bundle, exe):
     return {"Arch": "x86_64", "BundlePath": bundle, "Comment": "", "Enabled": True,
@@ -423,8 +459,50 @@ if is_amd and amd:
     if isinstance(ak.get("Emulate"), dict):
         kernel["Emulate"] = ak["Emulate"]
 
+# --- Laptop extras: PS/2 input, base SSDTs, iGPU framebuffer -------------------
+acpi_add = []
+if is_laptop:
+    kernel["Add"] += [
+        kext("VoodooPS2Controller.kext", "Contents/MacOS/VoodooPS2Controller"),
+        kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooInput.kext", "Contents/MacOS/VoodooInput"),
+        kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Keyboard.kext", "Contents/MacOS/VoodooPS2Keyboard"),
+        kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
+        kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
+    ]
+    acpi_add = [{"Comment": "", "Enabled": True, "Path": p}
+                for p in ("SSDT-EC-USBX-LAPTOP.aml", "SSDT-PLUG-DRTNIA.aml", "SSDT-PNLF.aml")]
+
+def le(v):
+    return bytes([v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF])
+
+def intel_framebuffer(dev):
+    # (ig-platform-id, device-id spoof) by GPU PCI device-id; None = no known match.
+    if dev == 0x5917:                       return le(0x87C00000), le(0x00005916)  # Kaby Lake-R UHD 620 (T480)
+    if 0x1900 <= dev <= 0x193F:             return le(0x19160000), None            # Skylake HD 5xx / Iris
+    if 0x5900 <= dev <= 0x593F:             return le(0x59160000), None            # Kaby Lake HD/UHD 620/630
+    if (0x3E00 <= dev <= 0x3EFF) or (0x9B00 <= dev <= 0x9BFF):
+        return le(0x3EA50009), le(0x00003EA5)                                      # Coffee/Comet Lake UHD 620/630
+    return None, None
+
+device_props = {}
+extra_boot_args = ""
+if is_laptop and igpu_dev is not None:
+    platform_id, spoof = intel_framebuffer(igpu_dev)
+    if platform_id is None:
+        extra_boot_args = " -igfxvesa"      # VESA fallback: unaccelerated but shows a picture
+    else:
+        props = {"AAPL,ig-platform-id": platform_id,
+                 "framebuffer-patch-enable": b"\x01\x00\x00\x00",
+                 "framebuffer-stolenmem": b"\x00\x00\x30\x01",
+                 "framebuffer-fbmem": b"\x00\x00\x90\x00"}
+        if spoof is not None:
+            props["device-id"] = spoof
+        device_props = {"PciRoot(0x0)/Pci(0x2,0x0)": props}
+
+boot_args = "-v keepsyms=1 debug=0x100" + extra_boot_args
+
 config = {
-    "ACPI": {"Add": [], "Delete": [], "Patch": [],
+    "ACPI": {"Add": acpi_add, "Delete": [], "Patch": [],
              "Quirks": {"FadtEnableReset": False, "NormalizeHeaders": False, "RebaseRegions": False,
                         "ResetHwSig": False, "ResetLogoStatus": True, "SyncTableIds": False}},
     "Booter": {"MmioWhitelist": [], "Patch": [],
@@ -432,10 +510,10 @@ config = {
                           "DisableSingleUser": False, "DisableVariableWrite": False, "DiscardHibernateMap": False,
                           "EnableSafeModeSlide": True, "EnableWriteUnprotector": False, "ForceBooterSignature": False,
                           "ForceExitBootServices": False, "ProtectMemoryRegions": False, "ProtectSecureBoot": False,
-                          "ProtectUefiServices": False, "ProvideCustomSlide": True, "ProvideMaxSlide": 0,
-                          "RebuildAppleMemoryMap": True, "ResizeAppleGpuBars": -1, "SetupVirtualMap": True,
+                          "ProtectUefiServices": True, "ProvideCustomSlide": True, "ProvideMaxSlide": 0,
+                          "RebuildAppleMemoryMap": False, "ResizeAppleGpuBars": -1, "SetupVirtualMap": True,
                           "SignalAppleOS": False, "SyncRuntimePermissions": True}},
-    "DeviceProperties": {"Add": {}, "Delete": {}},
+    "DeviceProperties": {"Add": device_props, "Delete": {}},
     "Kernel": kernel,
     "Misc": {"BlessOverride": [],
              "Boot": {"ConsoleAttributes": 0, "HibernateMode": "None", "HibernateSkipsPicker": False,
@@ -444,7 +522,7 @@ config = {
                       "PickerMode": "Builtin", "PickerVariant": "Auto", "PollAppleHotKeys": True,
                       "ShowPicker": True, "TakeoffDelay": 0, "Timeout": 10},
              "Debug": {"AppleDebug": True, "ApplePanic": True, "DisableWatchDog": True, "DisplayDelay": 0,
-                       "DisplayLevel": 2147483650, "LogModules": "*", "SysReport": False, "Target": 3},
+                       "DisplayLevel": 2147483650, "LogModules": "*", "SysReport": False, "Target": 67},
              "Entries": [],
              "Security": {"AllowSetDefault": True, "ApECID": 0, "AuthRestart": False, "BlacklistAppleUpdate": True,
                           "DmgLoading": "Signed", "EnablePassword": False, "ExposeSensitiveData": 6,
@@ -452,7 +530,7 @@ config = {
                           "ScanPolicy": 0, "SecureBootModel": "Disabled", "Vault": "Optional"},
              "Tools": []},
     "NVRAM": {"Add": {"7C436110-AB2A-4BBB-A880-FE41995C9F82":
-                          {"boot-args": "-v keepsyms=1 debug=0x100",
+                          {"boot-args": boot_args,
                            "csr-active-config": b"\x00\x00\x00\x00",
                            "prev-lang:kbd": b"en-US:0", "run-efi-updater": "No"},
                       "4D1EDE05-38C7-4A6A-9CC6-4BCCA8B38C14":
