@@ -117,3 +117,4 @@ macOS ist Apple vorbehalten; die Installation auf Nicht-Apple-Hardware verstöß
 gegen Apples Lizenzbedingungen. Dieses Werkzeug ist für Lern- und
 Kompatibilitätszwecke gedacht. Die macOS-Abbildungen werden ausschließlich von
 Apples eigenen Servern geladen.
+
