@@ -109,7 +109,15 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 - Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), die Basis-SSDTs
   (EC/USBX, PLUG, PNLF) und einen passenden MacBookPro-SMBIOS. OpenCore schreibt
   zusätzlich ein Protokoll (`opencore-*.txt`) auf den USB-Stick.
-- **Netzwerk im Installer:** Der Recovery-Stick lädt macOS von Apple, braucht also
+- **Offline-Installer (kein Netz beim Installieren):** Optional (im USB-Schritt bzw.
+  per Menü in `setup.sh`, ab macOS Big Sur, 32-GB-Stick). Der Stick bekommt eine
+  zweite ExFAT-Partition mit dem kompletten `InstallAssistant.pkg` von Apple. Die
+  Download-URL wird aus Apples Software-Update-Katalog gelesen (nicht geraten). Beim
+  Installieren: „macOS Base System" booten → Terminal → `bash UnPlugged.command`
+  (liegt mitsamt deutscher `INSTALL.txt` auf der Datenpartition) – installiert direkt
+  vom Stick, ohne Apple-Download. Ohne diese Option bleibt es beim kleinen
+  Online-Recovery-Stick.
+- **Netzwerk im Installer:** Der Online-Recovery-Stick lädt macOS von Apple, braucht also
   Internet. Der zuverlässige Weg ist **Kabel/Ethernet** – dafür ist `IntelMausi`
   (Intel-Ethernet, deckt fast alle ThinkPads/Business-Laptops ab) immer dabei und
   funktioniert bereits in der Recovery. WLAN im Installer ist auf Intel-Karten

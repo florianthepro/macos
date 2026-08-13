@@ -39,7 +39,7 @@ else
 fi
 
 LOG="${TMPDIR:-/tmp}/macos-usb-setup-$(date +%Y%m%d-%H%M%S).log"
-WORK=""; MNT=""
+WORK=""; MNT=""; DATA_MNT=""; OFFLINE=0
 
 log()  { printf '%s\n' "$*" >>"$LOG"; }
 step() { printf '%s==>%s %s\n' "$BOLD" "$RST" "$*"; log "STEP $*"; }
@@ -57,6 +57,7 @@ die() {
 
 cleanup() {
   [[ -n "$MNT" && -d "$MNT" ]] && { sync || true; umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true; }
+  [[ -n "$DATA_MNT" && -d "$DATA_MNT" ]] && { sync || true; umount "$DATA_MNT" 2>/dev/null || true; rmdir "$DATA_MNT" 2>/dev/null || true; }
   [[ -n "$WORK" && -d "$WORK" ]] && rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -275,6 +276,20 @@ choose_version() {
   SELECTED_RELEASE="${options[$((pick-1))]}"
 }
 
+choose_mode() {
+  OFFLINE=0
+  local darwin; IFS=: read -r _ _ _ darwin _ _ _ _ <<<"$SELECTED_RELEASE"
+  (( darwin >= 20 )) || return 0   # Voll-Installer (InstallAssistant.pkg) erst ab Big Sur
+  step "Installer-Typ"
+  printf '  %sOffline%s legt den KOMPLETTEN macOS-Installer (~12 GB) auf den Stick -\n' "$BOLD" "$RST"
+  printf '  die Installation braucht dann KEIN Internet. Erfordert einen 32-GB-Stick.\n\n'
+  printf '    1) Online  - kleiner Stick, laedt macOS beim Installieren von Apple (Standard)\n'
+  printf '    2) Offline - kompletter Installer auf dem Stick, kein Netz beim Installieren\n\n'
+  local pick; read -r -p "  Auswahl [1]: " pick </dev/tty || pick=1
+  [[ "$pick" == "2" ]] && OFFLINE=1
+  if (( OFFLINE == 1 )); then info "Offline-Installer gewaehlt"; else info "Online-Installer gewaehlt"; fi
+}
+
 SEL_DEV=""; SEL_SIZE=""
 choose_usb() {
   step "USB-Datentraeger waehlen"
@@ -306,6 +321,12 @@ choose_usb() {
   done
   SEL_DEV="${devs[$((pick-1))]}"; SEL_SIZE="${sizes[$((pick-1))]}"
 
+  if (( OFFLINE == 1 )); then
+    local bytes; bytes=$(blockdev --getsize64 "$SEL_DEV" 2>/dev/null || echo 0)
+    (( bytes == 0 || bytes >= 30000000000 )) \
+      || die USB "Fuer den Offline-Installer sind ~32 GB noetig (gewaehlt: $SEL_SIZE)." "Groesseren Stick verwenden oder Online-Modus."
+  fi
+
   local confirm
   printf '\n  %sAlle Daten auf %s (%s) werden geloescht.%s\n' "$RED" "$SEL_DEV" "$SEL_SIZE" "$RST"
   read -r -p "  Zum Bestaetigen 'LOESCHEN' eingeben: " confirm </dev/tty
@@ -318,25 +339,43 @@ fetch() { curl -fL --retry 5 --retry-delay 2 -C - -A "$UA" -o "$2" "$1" || die D
 
 prepare_usb() {
   step "USB wird vorbereitet: $SEL_DEV"
-  local part
-  [[ "$SEL_DEV" =~ [0-9]$ ]] && part="${SEL_DEV}p1" || part="${SEL_DEV}1"
+  local p1 p2
+  if [[ "$SEL_DEV" =~ [0-9]$ ]]; then p1="${SEL_DEV}p1"; p2="${SEL_DEV}p2"; else p1="${SEL_DEV}1"; p2="${SEL_DEV}2"; fi
 
   umount "${SEL_DEV}"* 2>/dev/null || true
   wipefs -a "$SEL_DEV"        >>"$LOG" 2>&1 || die USB "Datentraeger konnte nicht bereinigt werden." "USB neu einstecken, als root ausfuehren."
   sgdisk --zap-all "$SEL_DEV" >>"$LOG" 2>&1 || true
-  sgdisk -o -n 1:0:0 -t 1:0700 -c 1:"MACOS-USB" "$SEL_DEV" >>"$LOG" 2>&1 \
-    || die USB "GPT-Partition konnte nicht angelegt werden." "USB neu einstecken."
+
+  if (( OFFLINE == 1 )); then
+    command -v mkfs.exfat >/dev/null \
+      || die USB "mkfs.exfat fehlt (fuer die Datenpartition)." "exfatprogs installieren, z. B. 'apt install exfatprogs' oder 'dnf install exfatprogs'."
+    # p1 = 3 GB FAT32 (EFI + Recovery), p2 = Rest ExFAT (Voll-Installer, >4 GB).
+    sgdisk -o -n 1:0:+3G -t 1:0700 -c 1:"MACOS-USB" -n 2:0:0 -t 2:0700 -c 2:"MACOS-DATA" "$SEL_DEV" >>"$LOG" 2>&1 \
+      || die USB "Partitionen konnten nicht angelegt werden." "USB neu einstecken."
+  else
+    sgdisk -o -n 1:0:0 -t 1:0700 -c 1:"MACOS-USB" "$SEL_DEV" >>"$LOG" 2>&1 \
+      || die USB "GPT-Partition konnte nicht angelegt werden." "USB neu einstecken."
+  fi
   partprobe "$SEL_DEV" >>"$LOG" 2>&1 || true
   command -v udevadm >/dev/null && udevadm settle || true
   sleep 1
-  [[ -b "$part" ]] || die USB "Partition $part nicht gefunden." "USB neu verbinden."
+  [[ -b "$p1" ]] || die USB "Partition $p1 nicht gefunden." "USB neu verbinden."
 
-  mkfs.vfat -F 32 -n MACOSUSB "$part" >>"$LOG" 2>&1 \
+  mkfs.vfat -F 32 -n MACOSUSB "$p1" >>"$LOG" 2>&1 \
     || die USB "FAT32-Formatierung fehlgeschlagen." "USB neu einstecken."
-
   MNT=$(mktemp -d)
-  mount "$part" "$MNT" || die USB "Volume konnte nicht eingehaengt werden." "USB neu verbinden."
-  info "Volume bereit: $MNT"
+  mount "$p1" "$MNT" || die USB "Volume konnte nicht eingehaengt werden." "USB neu verbinden."
+
+  if (( OFFLINE == 1 )); then
+    [[ -b "$p2" ]] || die USB "Datenpartition $p2 nicht gefunden." "USB neu verbinden."
+    mkfs.exfat -n MACOSDATA "$p2" >>"$LOG" 2>&1 \
+      || die USB "ExFAT-Formatierung fehlgeschlagen." "USB neu einstecken."
+    DATA_MNT=$(mktemp -d)
+    mount "$p2" "$DATA_MNT" || die USB "Datenpartition konnte nicht eingehaengt werden." "USB neu verbinden."
+    info "Volume bereit: $MNT (+ Daten $DATA_MNT)"
+  else
+    info "Volume bereit: $MNT"
+  fi
 }
 
 assemble_efi() {
@@ -726,10 +765,87 @@ finish() {
   3.  Den USB-Datentraeger im UEFI-Modus auswaehlen.
   4.  Im OpenCore-Menue "macOS Base System" starten.
   5.  Festplattendienstprogramm oeffnen und das Ziellaufwerk als APFS loeschen.
+$(if (( OFFLINE == 1 )); then cat <<OFF
+  6.  Dienstprogramme -> Terminal:  cd "/Volumes/MACOS-DATA" && bash UnPlugged.command
+  7.  KEIN Internet noetig - der komplette Installer liegt auf dem Stick.
+      Details stehen in INSTALL.txt auf der Datenpartition.
+OFF
+else cat <<ON
   6.  "macOS installieren" waehlen und dem Assistenten folgen.
   7.  macOS wird dabei von Apple geladen - Internetverbindung erforderlich.
+ON
+fi)
 
   Protokoll: ${LOG}
+EOF
+}
+
+download_installer() {
+  (( OFFLINE == 1 )) || return 0
+  step "Voll-Installer wird geladen (Offline)"
+  local name marketing; IFS=: read -r name marketing _ _ _ _ _ _ <<<"$SELECTED_RELEASE"
+  local major="${marketing%%.*}"
+  info "Apple-Softwarekatalog wird gelesen"
+  local catalog="https://swscan.apple.com/content/catalogs/others/index-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+  curl -fsSL "$catalog" -o "$WORK/catalog.plist" \
+    || die Recovery "Apple-Katalog konnte nicht geladen werden." "Internet pruefen, erneut ausfuehren."
+  local url
+  url=$(python3 - "$major" "$WORK/catalog.plist" <<'PY'
+import sys, plistlib, urllib.request, re
+target, path = sys.argv[1], sys.argv[2]
+data = plistlib.load(open(path, "rb"))
+best = None
+for pid, p in data.get("Products", {}).items():
+    ia = next((k["URL"] for k in p.get("Packages", []) if k.get("URL", "").endswith("InstallAssistant.pkg")), None)
+    if not ia:
+        continue
+    dist = (p.get("Distributions") or {}).get("English")
+    ver = ""
+    if dist:
+        try:
+            x = urllib.request.urlopen(dist, timeout=30).read().decode("utf-8", "ignore")
+            m = re.search(r'id="InstallAssistantAuto"[^>]*versStr="([^"]+)"', x)
+            if m:
+                ver = m.group(1)
+        except Exception:
+            pass
+    if not ver or ver.split(".")[0] != target:
+        continue
+    d = p.get("PostDate")
+    if best is None or (d and d > best[0]):
+        best = (d, ia)
+if not best:
+    sys.exit(1)
+print(best[1])
+PY
+) || die Recovery "Kein Offline-Installer fuer diese Version im Apple-Katalog gefunden." "Andere Version waehlen."
+  info "InstallAssistant.pkg wird geladen (~12 GB, dauert lange)"
+  curl -L --retry 5 --retry-delay 2 -C - -o "$DATA_MNT/InstallAssistant.pkg" "$url" \
+    || die Recovery "Download des Voll-Installers fehlgeschlagen." "Erneut ausfuehren, der Download wird fortgesetzt."
+  info "UnPlugged + Anleitung werden abgelegt"
+  curl -fsSL "https://raw.githubusercontent.com/corpnewt/UnPlugged/main/UnPlugged.command" \
+    -o "$DATA_MNT/UnPlugged.command" || warn "UnPlugged.command konnte nicht geladen werden."
+  cat > "$DATA_MNT/INSTALL.txt" <<EOF
+Offline-Installation von macOS $name
+==============================================================
+
+Dieser Stick enthaelt den KOMPLETTEN Installer - es wird KEIN Internet benoetigt.
+
+1. Stick booten, im OpenCore-Menue "macOS Base System" waehlen.
+2. Menueleiste: Dienstprogramme -> Festplattendienstprogramm. Interne Platte als
+   "APFS" (Schema: GUID-Partitionstabelle) loeschen, z. B. "Macintosh HD".
+   Danach das Festplattendienstprogramm schliessen.
+3. Dienstprogramme -> Terminal:
+
+     cd "/Volumes/MACOS-DATA"
+     bash UnPlugged.command
+
+   Falls die Datenpartition nicht unter /Volumes auftaucht (nur Sonoma/Sequoia):
+     diskutil list physical
+     mkdir "/Volumes/MACOS-DATA"
+     /sbin/mount_exfat /dev/diskXsY "/Volumes/MACOS-DATA"
+
+4. Im Skript die geloeschte Zielplatte waehlen. Terminal offen lassen.
 EOF
 }
 
@@ -738,10 +854,12 @@ main() {
   require_tools
   scan_hardware
   choose_version
+  choose_mode
   choose_usb
   prepare_usb
   assemble_efi
   download_recovery
+  download_installer
   finish
 }
 
