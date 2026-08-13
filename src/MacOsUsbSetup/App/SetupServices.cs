@@ -25,5 +25,5 @@ public sealed class SetupServices
     public IInstallAssistantService InstallAssistant { get; } = new InstallAssistantClient();
     public IEfiInstaller EfiInstaller { get; }
 
-    public UsbBuildJob CreateBuildJob() => new(DiskPreparer, EfiInstaller, Recovery, InstallAssistant);
+    public UsbBuildJob CreateBuildJob() => new(DiskPreparer, EfiInstaller, Recovery, InstallAssistant, _efiAssets);
 }

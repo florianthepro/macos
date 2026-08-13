@@ -784,9 +784,11 @@ finish() {
   4.  Im OpenCore-Menue "macOS Base System" starten.
   5.  Festplattendienstprogramm oeffnen und das Ziellaufwerk als APFS loeschen.
 $(if (( OFFLINE == 1 )); then cat <<OFF
-  6.  Dienstprogramme -> Terminal:  cd "/Volumes/MACOS-DATA" && bash UnPlugged.command
+  6.  Dienstprogramme -> Terminal, EIN Kommando:
+        bash "/Volumes/MACOS-DATA/offline-install.command"
+      (formatiert automatisch + installiert, keine Rueckfragen)
   7.  KEIN Internet noetig - der komplette Installer liegt auf dem Stick.
-      Details stehen in INSTALL.txt auf der Datenpartition.
+      Details/Alternativen stehen in INSTALL.txt auf der Datenpartition.
 OFF
 else cat <<ON
   6.  "macOS installieren" waehlen und dem Assistenten folgen.
@@ -840,7 +842,11 @@ PY
   info "InstallAssistant.pkg wird geladen (~12 GB, dauert lange)"
   curl -L --retry 5 --retry-delay 2 -C - -o "$DATA_MNT/InstallAssistant.pkg" "$url" \
     || die Recovery "Download des Voll-Installers fehlgeschlagen." "Erneut ausfuehren, der Download wird fortgesetzt."
-  info "UnPlugged + Anleitung werden abgelegt"
+  info "Installer-Skript + Anleitung werden abgelegt"
+  # Primaer: unser Ein-Kommando-Skript (formatiert automatisch, keine Rueckfragen).
+  curl -fsSL "https://raw.githubusercontent.com/florianthepro/macos/main/scripts/offline-install.command" \
+    -o "$DATA_MNT/offline-install.command" || warn "offline-install.command konnte nicht geladen werden."
+  # Fallback: CorpNewt UnPlugged (interaktiv).
   curl -fsSL "https://raw.githubusercontent.com/corpnewt/UnPlugged/main/UnPlugged.command" \
     -o "$DATA_MNT/UnPlugged.command" || warn "UnPlugged.command konnte nicht geladen werden."
   cat > "$DATA_MNT/INSTALL.txt" <<EOF
@@ -850,20 +856,23 @@ Offline-Installation von macOS $name
 Dieser Stick enthaelt den KOMPLETTEN Installer - es wird KEIN Internet benoetigt.
 
 1. Stick booten, im OpenCore-Menue "macOS Base System" waehlen.
-2. Menueleiste: Dienstprogramme -> Festplattendienstprogramm. Interne Platte als
-   "APFS" (Schema: GUID-Partitionstabelle) loeschen, z. B. "Macintosh HD".
-   Danach das Festplattendienstprogramm schliessen.
-3. Dienstprogramme -> Terminal:
+2. Dienstprogramme -> Terminal. EIN Kommando:
 
-     cd "/Volumes/MACOS-DATA"
-     bash UnPlugged.command
+     bash "/Volumes/MACOS-DATA/offline-install.command"
 
-   Falls die Datenpartition nicht unter /Volumes auftaucht (nur Sonoma/Sequoia):
+   Das Skript formatiert die interne Platte automatisch und installiert -
+   keine manuelle Formatierung, keine Rueckfragen (10 s Countdown, Abbruch Strg-C).
+   Terminal-Fenster offen lassen.
+
+   Mehrere interne Platten? Mit Ziel starten, z. B.:
+     bash "/Volumes/MACOS-DATA/offline-install.command" /dev/disk0
+
+Nur bei Sonoma/Sequoia, falls "MACOS-DATA" fehlt:
      diskutil list physical
      mkdir "/Volumes/MACOS-DATA"
      /sbin/mount_exfat /dev/diskXsY "/Volumes/MACOS-DATA"
 
-4. Im Skript die geloeschte Zielplatte waehlen. Terminal offen lassen.
+Alternative (interaktiv): bash "/Volumes/MACOS-DATA/UnPlugged.command"
 EOF
 }
 

@@ -28,14 +28,17 @@ public sealed class UsbBuildJob
     private readonly IEfiInstaller _efi;
     private readonly IRecoveryImageService _recovery;
     private readonly IInstallAssistantService _installer;
+    private readonly EfiAssets _assets;
 
     public UsbBuildJob(
-        IDiskPreparer preparer, IEfiInstaller efi, IRecoveryImageService recovery, IInstallAssistantService installer)
+        IDiskPreparer preparer, IEfiInstaller efi, IRecoveryImageService recovery,
+        IInstallAssistantService installer, EfiAssets assets)
     {
         _preparer = preparer;
         _efi = efi;
         _recovery = recovery;
         _installer = installer;
+        _assets = assets;
     }
 
     public async Task RunAsync(
@@ -100,13 +103,20 @@ public sealed class UsbBuildJob
         await WriteHelpersAsync(plan, volume.DataRoot, info, ct);
     }
 
-    private static async Task WriteHelpersAsync(InstallPlan plan, string dataRoot, InstallAssistantInfo info, CancellationToken ct)
+    private async Task WriteHelpersAsync(InstallPlan plan, string dataRoot, InstallAssistantInfo info, CancellationToken ct)
     {
+        // Primary: the non-interactive one-command installer (auto-formats, no questions).
+        if (_assets.OfflineInstallScript is { } script && File.Exists(script))
+        {
+            try { File.Copy(script, Path.Combine(dataRoot, "offline-install.command"), overwrite: true); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { Log.Warn($"offline-install.command: {ex.Message}"); }
+        }
+        // Fallback: CorpNewt UnPlugged (interactive), best-effort.
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-            var script = await http.GetStringAsync(UnPluggedUrl, ct);
-            await File.WriteAllTextAsync(Path.Combine(dataRoot, "UnPlugged.command"), script, ct);
+            var unplugged = await http.GetStringAsync(UnPluggedUrl, ct);
+            await File.WriteAllTextAsync(Path.Combine(dataRoot, "UnPlugged.command"), unplugged, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -123,22 +133,23 @@ public sealed class UsbBuildJob
          Dieser Stick enthält den KOMPLETTEN Installer - es wird KEIN Internet benötigt.
 
          1. Stick booten, im OpenCore-Menü "macOS Base System" wählen.
-         2. Oben in der Menüleiste: Dienstprogramme -> Festplattendienstprogramm.
-            Die interne Platte als "APFS" (Schema: GUID-Partitionstabelle) löschen,
-            z. B. Name "Macintosh HD". Danach das Festplattendienstprogramm schließen.
-         3. Dienstprogramme -> Terminal öffnen. Eingeben:
+         2. Menüleiste: Dienstprogramme -> Terminal öffnen. Ein Kommando:
 
-              cd "/Volumes/{DataLabelForReadme}"
-              bash UnPlugged.command
+              bash "/Volumes/{DataLabelForReadme}/offline-install.command"
 
-            Falls die Datenpartition nicht unter /Volumes auftaucht (nur macOS Sonoma/Sequoia):
+            Das Skript formatiert die interne Platte automatisch und installiert -
+            keine manuelle Formatierung, keine Rückfragen. (Sicherheits-Countdown:
+            10 Sekunden, Abbruch mit Strg-C.) Terminal-Fenster offen lassen.
+
+            Gibt es mehrere interne Platten, das Skript mit Ziel starten, z. B.:
+              bash "/Volumes/{DataLabelForReadme}/offline-install.command" /dev/disk0
+
+         Nur bei macOS Sonoma/Sequoia, falls "{DataLabelForReadme}" fehlt:
               diskutil list physical
               mkdir "/Volumes/{DataLabelForReadme}"
               /sbin/mount_exfat /dev/diskXsY "/Volumes/{DataLabelForReadme}"
-            (diskXsY = die ExFAT-Partition aus der Liste)
 
-         4. Im Skript die eben gelöschte Zielplatte wählen und bestätigen.
-            Terminal-Fenster offen lassen - es installiert dann von diesem Stick.
+         Alternative (interaktiv, von CorpNewt): bash "/Volumes/{DataLabelForReadme}/UnPlugged.command"
 
          Der Installer wurde von Apple geladen: {info.Title} {info.Version}
          """;

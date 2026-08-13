@@ -94,6 +94,11 @@ function Build-Payload {
     if (Test-Path $macserial) { Copy-Item $macserial (Join-Path $staging 'macserial.exe') -Force }
     else { Write-Warning 'macserial.exe not found in OpenCore package' }
 
+    # Recovery-side offline installer script -> payload root (written to the data partition).
+    $offlineScript = Join-Path $root 'scripts/offline-install.command'
+    if (Test-Path $offlineScript) { Copy-Item $offlineScript (Join-Path $staging 'offline-install.command') -Force }
+    else { Write-Warning 'offline-install.command not found' }
+
     $ocRoot   = Join-Path $efi 'OC'
     $drivers  = Join-Path $ocRoot 'Drivers'
     $kexts    = Join-Path $ocRoot 'Kexts'

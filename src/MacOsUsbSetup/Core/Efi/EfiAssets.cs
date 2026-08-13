@@ -45,6 +45,16 @@ public sealed class EfiAssets
         }
     }
 
+    /// <summary>Recovery-side non-interactive offline installer script; null when absent.</summary>
+    public string? OfflineInstallScript
+    {
+        get
+        {
+            var path = Path.Combine(_root.Value, "offline-install.command");
+            return File.Exists(path) ? path : null;
+        }
+    }
+
     private static string Extract()
     {
         var assembly = Assembly.GetExecutingAssembly();
