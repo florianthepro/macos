@@ -1,0 +1,28 @@
+Assembling EFI payload from upstream releases...
+  fetch acidanthera/OpenCorePkg 1.0.7 -> OpenCore-1.0.7-RELEASE.zip
+  fetch acidanthera/Lilu 1.7.1 -> Lilu-1.7.1-RELEASE.zip
+  fetch acidanthera/VirtualSMC 1.3.7 -> VirtualSMC-1.3.7-RELEASE.zip
+  fetch acidanthera/WhateverGreen 1.7.0 -> WhateverGreen-1.7.0-RELEASE.zip
+EFI payload written: C:\Users\Win11 Pro\Downloads\macos-main\macos-main\src\MacOsUsbSetup\Assets\efi-payload.zip
+dotnet nicht gefunden - .NET 8 SDK wird via winget installiert...
+Publishing setup.exe (dotnet: Found Microsoft .NET SDK 8.0 [Microsoft.DotNet.SDK.8] Version 8.0.424 This application is licensed to you by its owner. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages. Downloading https://download.microsoft.com/download/6141e558-e0ef-473c-8dc2-122d381f9bc8/988b5e46-33a0-4cfe-8fb1-d8b90ec1d280/dotnet-sdk-8.0.424-win-x64.exe Successfully verified installer hash Starting package install... Successfully installed C:\Program Files\dotnet\dotnet.exe)...
+C:\Users\Win11 Pro\Downloads\macos-main\macos-main\src\build.ps1 : Die Benennung "Found Microsoft .NET SDK 8.0
+[Microsoft.DotNet.SDK.8] Version 8.0.424 This application is licensed to you by its owner. Microsoft is not
+responsible for, nor does it grant any licenses to, third-party packages. Downloading https://download.microsoft.com/do
+wnload/6141e558-e0ef-473c-8dc2-122d381f9bc8/988b5e46-33a0-4cfe-8fb1-d8b90ec1d280/dotnet-sdk-8.0.424-win-x64.exe
+Successfully verified installer hash Starting package install... Successfully installed C:\Program
+Files\dotnet\dotnet.exe" wurde nicht als Name eines Cmdlet, einer Funktion, einer Skriptdatei oder eines ausführbaren
+Programms erkannt. Überprüfen Sie die Schreibweise des Namens, oder ob der Pfad korrekt ist (sofern enthalten), und
+wiederholen Sie den Vorgang.
+    + CategoryInfo          : ObjectNotFound: (Found Microsoft...tnet\dotnet.exe:String) [build.ps1], CommandNotFoundE
+   xception
+    + FullyQualifiedErrorId : CommandNotFoundException,build.ps1
+
+
+Build fehlgeschlagen - Meldungen oben pruefen.
+Drücken Sie eine beliebige Taste . . .
+
+
+
+
+
