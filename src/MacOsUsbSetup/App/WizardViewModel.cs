@@ -58,8 +58,9 @@ public sealed class WizardViewModel : ViewModelBase
 
     private void ShowUsb(MacOsRelease release)
     {
-        var usb = new UsbViewModel(_services);
-        usb.DiskChosen += disk => ShowWrite(new InstallPlan(release, disk));
+        // The full offline installer (InstallAssistant.pkg) exists only for macOS 11 Big Sur+.
+        var usb = new UsbViewModel(_services, offlineAvailable: release.DarwinMajor >= 20);
+        usb.DiskChosen += disk => ShowWrite(new InstallPlan(release, disk, usb.Offline));
         usb.BackRequested += ShowVersions;
         CurrentPage = usb;
     }

@@ -10,7 +10,14 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="{Binding Headline}" FontSize="18" FontWeight="SemiBold" />
-        <TextBlock Grid.Row="1" Text="{Binding Warning}" Foreground="{StaticResource Badge.Experimental}" Margin="0,8,0,16" />
+        <StackPanel Grid.Row="1" Margin="0,8,0,16">
+            <TextBlock Text="{Binding Warning}" Foreground="{StaticResource Badge.Experimental}" />
+            <CheckBox IsChecked="{Binding Offline}" Margin="0,10,0,0"
+                      Visibility="{Binding OfflineAvailable, Converter={StaticResource BoolToVisible}}">
+                <TextBlock Text="{Binding OfflineLabel}" TextWrapping="Wrap" MaxWidth="660"
+                           Foreground="{StaticResource Text.Primary}" />
+            </CheckBox>
+        </StackPanel>
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
                       Visibility="{Binding HasDisks, Converter={StaticResource BoolToVisible}}">

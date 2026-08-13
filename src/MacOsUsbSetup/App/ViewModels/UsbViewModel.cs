@@ -9,10 +9,12 @@ namespace MacOsUsbSetup.App.ViewModels;
 public sealed class UsbViewModel : ViewModelBase
 {
     private readonly SetupServices _services;
+    private bool _offline;
 
-    public UsbViewModel(SetupServices services)
+    public UsbViewModel(SetupServices services, bool offlineAvailable = false)
     {
         _services = services;
+        OfflineAvailable = offlineAvailable;
         RefreshCommand = new RelayCommand(_ => Refresh());
         BackCommand = new RelayCommand(_ => BackRequested?.Invoke());
         Refresh();
@@ -23,6 +25,15 @@ public sealed class UsbViewModel : ViewModelBase
     public string EmptyNotice => "Kein USB-Datenträger gefunden. Stick einstecken und aktualisieren.";
     public ObservableCollection<UsbTileViewModel> Disks { get; } = new();
     public bool HasDisks => Disks.Count > 0;
+
+    /// <summary>macOS 11+ can be written as a full offline installer (needs a 32 GB+ stick).</summary>
+    public bool OfflineAvailable { get; }
+    public string OfflineLabel => "Offline-Installer (kompletter Installer auf den Stick, ~12 GB, kein Netz beim Installieren - 32 GB-Stick nötig)";
+    public bool Offline
+    {
+        get => _offline;
+        set => Set(ref _offline, value);
+    }
     public RelayCommand RefreshCommand { get; }
     public RelayCommand BackCommand { get; }
 

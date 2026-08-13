@@ -15,8 +15,11 @@ public sealed record UsbDisk(
     public double SizeGigabytes => SizeBytes / 1_000_000_000d;
 }
 
-/// <summary>The formatted, mounted target ready to receive the EFI and recovery.</summary>
-public sealed record PreparedVolume(string RootPath, string VolumeLabel, int DiskNumber);
+/// <summary>
+/// The formatted, mounted target ready to receive the EFI and recovery. <see cref="DataRoot"/> is
+/// the mounted second (ExFAT) partition when the offline installer was requested, else null.
+/// </summary>
+public sealed record PreparedVolume(string RootPath, string VolumeLabel, int DiskNumber, string? DataRoot = null);
 
 public interface IUsbDiskEnumerator
 {
@@ -26,8 +29,10 @@ public interface IUsbDiskEnumerator
 public interface IDiskPreparer
 {
     /// <summary>
-    /// Wipes the disk, creates a single bootable FAT32 volume and returns it
-    /// mounted. Throws <see cref="Diagnostics.SetupException"/> on any failure.
+    /// Wipes the disk and creates a bootable FAT32 volume, returned mounted. When
+    /// <paramref name="offline"/> is set, a second ExFAT data partition is added (for the full
+    /// installer) and exposed via <see cref="PreparedVolume.DataRoot"/>. Throws
+    /// <see cref="Diagnostics.SetupException"/> on any failure.
     /// </summary>
-    Task<PreparedVolume> PrepareAsync(UsbDisk disk, IProgress<string> log, CancellationToken ct);
+    Task<PreparedVolume> PrepareAsync(UsbDisk disk, bool offline, IProgress<string> log, CancellationToken ct);
 }

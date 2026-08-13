@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using MacOsUsbSetup.Core.Diagnostics;
 using MacOsUsbSetup.Core.Download;
 using MacOsUsbSetup.Core.Efi;
@@ -9,25 +10,32 @@ using MacOsUsbSetup.Core.Usb;
 namespace MacOsUsbSetup.Core.Setup;
 
 /// <summary>
-/// Runs the whole build in order: prepare the USB, write the EFI, then download
-/// and verify the macOS recovery. Stage progress is mapped onto one overall bar.
+/// Runs the whole build in order: prepare the USB, write the EFI, then download and verify the
+/// macOS recovery. For an offline plan it also downloads the full installer onto the data
+/// partition and drops the recovery-side install helper. Stage progress is mapped onto one bar.
 /// </summary>
 public sealed class UsbBuildJob
 {
-    private const double PrepareEnd  = 0.08;
-    private const double EfiEnd  = 0.15;
-    private const double LookupEnd  = 0.18;
-    private const double DownloadEnd = 0.99;
+    // Raw UnPlugged.command (CorpNewt): reconstructs the installer app from InstallAssistant.pkg in
+    // the recovery Terminal and launches it — the maintained tool for exactly this offline flow.
+    private const string UnPluggedUrl = "https://raw.githubusercontent.com/corpnewt/UnPlugged/main/UnPlugged.command";
+
+    private const double PrepareEnd = 0.05;
+    private const double EfiEnd = 0.10;
+    private const double LookupEnd = 0.12;
 
     private readonly IDiskPreparer _preparer;
     private readonly IEfiInstaller _efi;
     private readonly IRecoveryImageService _recovery;
+    private readonly IInstallAssistantService _installer;
 
-    public UsbBuildJob(IDiskPreparer preparer, IEfiInstaller efi, IRecoveryImageService recovery)
+    public UsbBuildJob(
+        IDiskPreparer preparer, IEfiInstaller efi, IRecoveryImageService recovery, IInstallAssistantService installer)
     {
         _preparer = preparer;
         _efi = efi;
         _recovery = recovery;
+        _installer = installer;
     }
 
     public async Task RunAsync(
@@ -42,9 +50,12 @@ public sealed class UsbBuildJob
             Log.Info(message);
         }
 
+        // Reserve most of the bar for the full installer when offline (it dwarfs the recovery).
+        var recoveryEnd = plan.Offline ? 0.30 : 0.99;
+
         Report(SetupStage.UsbPreparation, 0.01, $"USB wird vorbereitet: {plan.Target.Model}");
         var prepareLog = new Progress<string>(line => Report(SetupStage.UsbPreparation, PrepareEnd * 0.6, line));
-        var volume = await _preparer.PrepareAsync(plan.Target, prepareLog, ct);
+        var volume = await _preparer.PrepareAsync(plan.Target, plan.Offline, prepareLog, ct);
         Report(SetupStage.UsbPreparation, PrepareEnd, $"Volume bereit: {volume.RootPath} ({volume.VolumeLabel})");
 
         Report(SetupStage.EfiInstallation, PrepareEnd + 0.01, "EFI und OpenCore werden geschrieben");
@@ -57,15 +68,83 @@ public sealed class UsbBuildJob
         Report(SetupStage.RecoveryLookup, LookupEnd, "Download-Freigabe erhalten");
 
         var recoveryDir = Path.Combine(volume.RootPath, "com.apple.recovery.boot");
-        var downloadLog = new Progress<DownloadProgress>(p =>
-        {
-            var fraction = LookupEnd + (p.Fraction ?? 0) * (DownloadEnd - LookupEnd);
-            var received = p.BytesReceived / 1_000_000d;
-            var total = p.TotalBytes is > 0 ? $" / {p.TotalBytes.Value / 1_000_000d:0} MB" : "";
-            Report(SetupStage.RecoveryDownload, fraction, $"{p.FileName}: {received:0} MB{total}");
-        });
-        await _recovery.DownloadAsync(image, recoveryDir, downloadLog, ct);
+        var recoveryLog = new Progress<DownloadProgress>(p => Report(SetupStage.RecoveryDownload,
+            LookupEnd + (p.Fraction ?? 0) * (recoveryEnd - LookupEnd),
+            $"{p.FileName}: {p.BytesReceived / 1_000_000d:0} MB{Total(p)}"));
+        await _recovery.DownloadAsync(image, recoveryDir, recoveryLog, ct);
+
+        if (plan.Offline)
+            await AddOfflineInstallerAsync(plan, volume, recoveryEnd, Report, ct);
 
         Report(SetupStage.Verification, 1.0, "Fertig - der USB-Stick ist bootfähig.");
     }
+
+    // Downloads the full installer onto the ExFAT data partition and drops the recovery-side
+    // helper (UnPlugged.command) plus a German how-to, so the install needs no network.
+    private async Task AddOfflineInstallerAsync(
+        InstallPlan plan, PreparedVolume volume, double recoveryEnd, Action<SetupStage, double, string> report, CancellationToken ct)
+    {
+        if (volume.DataRoot is null)
+            throw new SetupException(SetupStage.RecoveryDownload,
+                "Datenpartition für den Offline-Installer fehlt.", "Setup erneut ausführen.");
+
+        report(SetupStage.RecoveryLookup, recoveryEnd, "Voll-Installer wird bei Apple gesucht");
+        var info = await _installer.ResolveAsync(plan.Release, ct);
+
+        var installLog = new Progress<DownloadProgress>(p => report(SetupStage.RecoveryDownload,
+            recoveryEnd + (p.Fraction ?? 0) * (0.98 - recoveryEnd),
+            $"InstallAssistant.pkg: {p.BytesReceived / 1_000_000d:0} MB{Total(p)}"));
+        await _installer.DownloadAsync(info, volume.DataRoot, installLog, ct);
+
+        report(SetupStage.RecoveryDownload, 0.98, "Installer-Hilfsskript wird abgelegt");
+        await WriteHelpersAsync(plan, volume.DataRoot, info, ct);
+    }
+
+    private static async Task WriteHelpersAsync(InstallPlan plan, string dataRoot, InstallAssistantInfo info, CancellationToken ct)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+            var script = await http.GetStringAsync(UnPluggedUrl, ct);
+            await File.WriteAllTextAsync(Path.Combine(dataRoot, "UnPlugged.command"), script, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warn($"UnPlugged.command konnte nicht geladen werden: {ex.Message}");
+        }
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "INSTALL.txt"), InstallReadme(plan, info), ct);
+    }
+
+    private static string InstallReadme(InstallPlan plan, InstallAssistantInfo info) =>
+        $"""
+         Offline-Installation von macOS {plan.Release.Name} ({info.Version})
+         =================================================================
+
+         Dieser Stick enthält den KOMPLETTEN Installer - es wird KEIN Internet benötigt.
+
+         1. Stick booten, im OpenCore-Menü "macOS Base System" wählen.
+         2. Oben in der Menüleiste: Dienstprogramme -> Festplattendienstprogramm.
+            Die interne Platte als "APFS" (Schema: GUID-Partitionstabelle) löschen,
+            z. B. Name "Macintosh HD". Danach das Festplattendienstprogramm schließen.
+         3. Dienstprogramme -> Terminal öffnen. Eingeben:
+
+              cd "/Volumes/{DataLabelForReadme}"
+              bash UnPlugged.command
+
+            Falls die Datenpartition nicht unter /Volumes auftaucht (nur macOS Sonoma/Sequoia):
+              diskutil list physical
+              mkdir "/Volumes/{DataLabelForReadme}"
+              /sbin/mount_exfat /dev/diskXsY "/Volumes/{DataLabelForReadme}"
+            (diskXsY = die ExFAT-Partition aus der Liste)
+
+         4. Im Skript die eben gelöschte Zielplatte wählen und bestätigen.
+            Terminal-Fenster offen lassen - es installiert dann von diesem Stick.
+
+         Der Installer wurde von Apple geladen: {info.Title} {info.Version}
+         """;
+
+    private const string DataLabelForReadme = "MACOS-DATA";
+
+    private static string Total(DownloadProgress p) =>
+        p.TotalBytes is > 0 ? $" / {p.TotalBytes.Value / 1_000_000d:0} MB" : "";
 }

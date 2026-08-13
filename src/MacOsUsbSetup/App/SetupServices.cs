@@ -22,7 +22,8 @@ public sealed class SetupServices
     public IUsbDiskEnumerator UsbEnumerator { get; } = new UsbDiskEnumerator();
     public IDiskPreparer DiskPreparer { get; } = new DiskPreparer();
     public IRecoveryImageService Recovery { get; } = new AppleRecoveryClient();
+    public IInstallAssistantService InstallAssistant { get; } = new InstallAssistantClient();
     public IEfiInstaller EfiInstaller { get; }
 
-    public UsbBuildJob CreateBuildJob() => new(DiskPreparer, EfiInstaller, Recovery);
+    public UsbBuildJob CreateBuildJob() => new(DiskPreparer, EfiInstaller, Recovery, InstallAssistant);
 }
