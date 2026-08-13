@@ -109,6 +109,14 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 - Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), die Basis-SSDTs
   (EC/USBX, PLUG, PNLF) und einen passenden MacBookPro-SMBIOS. OpenCore schreibt
   zusätzlich ein Protokoll (`opencore-*.txt`) auf den USB-Stick.
+- **Netzwerk im Installer:** Der Recovery-Stick lädt macOS von Apple, braucht also
+  Internet. Der zuverlässige Weg ist **Kabel/Ethernet** – dafür ist `IntelMausi`
+  (Intel-Ethernet, deckt fast alle ThinkPads/Business-Laptops ab) immer dabei und
+  funktioniert bereits in der Recovery. WLAN im Installer ist auf Intel-Karten
+  unzuverlässig; `AirportItlwm` (natives Intel-WLAN, passend zur gewählten
+  macOS-Version) wird mitgeliefert, greift aber vor allem im **installierten**
+  System. Laptop ohne Ethernet: USB-Ethernet-Adapter mit **RTL8153**-Chip (läuft
+  ohne Treiber). ASIX-`AX88179` (Original) funktioniert **nicht** ohne Treiber.
 - CFG-Lock (gesperrtes MSR `0xE2`) ist in Standard-Laptop-BIOS meist aktiv und
   lässt sich dort nicht abschalten; macOS würde sonst früh mit einem Kernel-Panic
   abstürzen. Der passende Quirk wird je nach CPU automatisch gesetzt

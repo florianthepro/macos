@@ -13,6 +13,8 @@ LILU_VERSION="1.7.1"
 VSMC_VERSION="1.3.7"
 WEG_VERSION="1.7.0"
 VOODOOPS2_VERSION="2.3.7"
+INTELMAUSI_VERSION="1.0.8"
+AIRPORTITLWM_VERSION="v2.3.0"
 
 readonly OSRECOVERY="http://osrecovery.apple.com"
 readonly UA="InternetRecovery/1.0"
@@ -356,7 +358,8 @@ assemble_efi() {
   mkdir -p "$kexts"
 
   local k
-  for k in "Lilu:${LILU_VERSION}" "VirtualSMC:${VSMC_VERSION}" "WhateverGreen:${WEG_VERSION}"; do
+  # IntelMausi (Intel-Ethernet) immer mit: verlässlicher Weg, den Installer online zu bekommen.
+  for k in "Lilu:${LILU_VERSION}" "VirtualSMC:${VSMC_VERSION}" "WhateverGreen:${WEG_VERSION}" "IntelMausi:${INTELMAUSI_VERSION}"; do
     local nm=${k%%:*} ver=${k##*:}
     info "${nm} ${ver} wird geladen"
     fetch "https://github.com/acidanthera/${nm}/releases/download/${ver}/${nm}-${ver}-RELEASE.zip" "$WORK/${nm}.zip"
@@ -365,6 +368,28 @@ assemble_efi() {
     [[ -n "$src" ]] || die EFI "Kext ${nm}.kext nicht gefunden." "Erneut versuchen."
     cp -r "$src" "$kexts/${nm}.kext"
   done
+
+  # AirportItlwm (natives Intel-WLAN) fuers installierte System – nur die zur gewaehlten
+  # macOS-Version passende Variante laden. Der Kext heißt im Zip immer AirportItlwm.kext,
+  # die Version steckt nur im Zip-Namen; als AirportItlwm-<OS>.kext ablegen.
+  local sel_darwin os dest
+  IFS=: read -r _ _ _ sel_darwin _ _ _ _ <<<"$SELECTED_RELEASE"
+  case "$sel_darwin" in
+    19) os="Catalina";   dest="Catalina" ;;
+    20) os="BigSur";     dest="BigSur" ;;
+    21) os="Monterey";   dest="Monterey" ;;
+    22) os="Ventura";    dest="Ventura" ;;
+    23) os="Sonoma14.4"; dest="Sonoma" ;;
+    *)  os=""; dest="" ;;   # High Sierra / Sequoia / Tahoe: kein stabiler AirportItlwm-Build
+  esac
+  if [[ -n "$os" ]]; then
+    info "AirportItlwm ${AIRPORTITLWM_VERSION} (${dest}) wird geladen (WLAN)"
+    fetch "https://github.com/OpenIntelWireless/itlwm/releases/download/${AIRPORTITLWM_VERSION}/AirportItlwm_${AIRPORTITLWM_VERSION}_stable_${os}.kext.zip" "$WORK/airport.zip"
+    unzip -q "$WORK/airport.zip" -d "$WORK/airport"
+    local aw; aw=$(find "$WORK/airport" -maxdepth 3 -type d -name 'AirportItlwm.kext' | head -n1)
+    [[ -n "$aw" ]] || die EFI "AirportItlwm.kext (${os}) nicht gefunden." "Erneut versuchen."
+    cp -r "$aw" "$kexts/AirportItlwm-${dest}.kext"
+  fi
 
   if [[ "$IS_LAPTOP" -eq 1 ]]; then
     info "VoodooPS2 ${VOODOOPS2_VERSION} wird geladen (Tastatur/Trackpad)"
@@ -399,8 +424,8 @@ assemble_efi() {
 
 generate_config() {
   local out=$1 amd=$2
-  local rec smbios_desktop smbios_laptop smbios
-  IFS=: read -r _ _ _ _ _ _ smbios_desktop smbios_laptop <<<"$SELECTED_RELEASE"
+  local rec smbios_desktop smbios_laptop smbios sel_darwin
+  IFS=: read -r _ _ _ sel_darwin _ _ smbios_desktop smbios_laptop <<<"$SELECTED_RELEASE"
   if [[ "$CPU_VENDOR" == "amd" || "$IS_LAPTOP" -ne 1 ]]; then
     smbios="$smbios_desktop"
   elif [[ "$CPU_VENDOR" == "intel" ]]; then
@@ -418,7 +443,7 @@ generate_config() {
   local is_amd=0; [[ "$CPU_VENDOR" == "amd" ]] && is_amd=1
   local igpu_dev=""; [[ "$IS_LAPTOP" -eq 1 && "$CPU_VENDOR" == "intel" ]] && igpu_dev="$INTEL_IGPU_DEV"
 
-  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" "$CPU_VENDOR" "$CPU_MODEL" <<'PY'
+  if ! python3 - "$out" "$smbios" "$is_amd" "$CPU_CORES" "${amd:-}" "$IS_LAPTOP" "$igpu_dev" "$CPU_VENDOR" "$CPU_MODEL" "$sel_darwin" <<'PY'
 import sys, secrets, plistlib
 
 out, smbios, is_amd, cores, amd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", int(sys.argv[4]), sys.argv[5]
@@ -426,6 +451,7 @@ is_laptop = sys.argv[6] == "1"
 igpu_dev = int(sys.argv[7], 16) if len(sys.argv) > 7 and sys.argv[7] else None
 cpu_intel = len(sys.argv) > 8 and sys.argv[8] == "intel"
 cpu_model = int(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9] else 0
+sel_darwin = int(sys.argv[10]) if len(sys.argv) > 10 and sys.argv[10] else 0
 
 # CFG Lock (locked MSR 0xE2) panics macOS early on most stock laptop firmware; patch the
 # write out. Haswell+ uses native XCPM, Sandy/Ivy and older the legacy path.
@@ -443,10 +469,17 @@ def kext(bundle, exe):
 def driver(path):
     return {"Arguments": "", "Comment": "", "Enabled": True, "LoadEarly": False, "Path": path}
 
+# IntelMausi (Ethernet) immer; AirportItlwm (WLAN) passend zur macOS-Version fuers
+# installierte System. Kabel bleibt der sichere Weg fuer die Installation selbst.
+net_kexts = [kext("IntelMausi.kext", "Contents/MacOS/IntelMausi")]
+_wifi = {19: "Catalina", 20: "BigSur", 21: "Monterey", 22: "Ventura", 23: "Sonoma"}.get(sel_darwin)
+if _wifi:
+    net_kexts.append(kext("AirportItlwm-%s.kext" % _wifi, "Contents/MacOS/AirportItlwm"))
+
 kernel = {
     "Add": [kext("Lilu.kext", "Contents/MacOS/Lilu"),
             kext("VirtualSMC.kext", "Contents/MacOS/VirtualSMC"),
-            kext("WhateverGreen.kext", "Contents/MacOS/WhateverGreen")],
+            kext("WhateverGreen.kext", "Contents/MacOS/WhateverGreen")] + net_kexts,
     "Block": [], "Force": [], "Patch": [],
     "Emulate": {"Cpuid1Data": b"", "Cpuid1Mask": b"", "DummyPowerManagement": False,
                 "MaxKernel": "", "MinKernel": ""},

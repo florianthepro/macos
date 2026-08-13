@@ -22,7 +22,9 @@ param(
     [string]$LiluVersion     = '1.7.1',
     [string]$VirtualSmcVersion = '1.3.7',
     [string]$WhateverGreenVersion = '1.7.0',
-    [string]$VoodooPS2Version = '2.3.7'
+    [string]$VoodooPS2Version = '2.3.7',
+    [string]$IntelMausiVersion = '1.0.8',
+    [string]$AirportItlwmVersion = 'v2.3.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -103,7 +105,8 @@ function Build-Payload {
     $kextSources = @(
         @{ repo = 'acidanthera/Lilu';          tag = $LiluVersion;          asset = "Lilu-$LiluVersion-RELEASE.zip";                   pick = 'Lilu.kext' },
         @{ repo = 'acidanthera/VirtualSMC';     tag = $VirtualSmcVersion;    asset = "VirtualSMC-$VirtualSmcVersion-RELEASE.zip";       pick = 'VirtualSMC.kext' },
-        @{ repo = 'acidanthera/WhateverGreen';  tag = $WhateverGreenVersion; asset = "WhateverGreen-$WhateverGreenVersion-RELEASE.zip"; pick = 'WhateverGreen.kext' }
+        @{ repo = 'acidanthera/WhateverGreen';  tag = $WhateverGreenVersion; asset = "WhateverGreen-$WhateverGreenVersion-RELEASE.zip"; pick = 'WhateverGreen.kext' },
+        @{ repo = 'acidanthera/IntelMausi';     tag = $IntelMausiVersion;    asset = "IntelMausi-$IntelMausiVersion-RELEASE.zip";       pick = 'IntelMausi.kext' }
     )
     foreach ($k in $kextSources) {
         $z = Get-Release $k.repo $k.tag $k.asset (Join-Path $cache ($k.pick + '.zip'))
@@ -121,6 +124,26 @@ function Build-Payload {
     $vpSrc = Get-ChildItem $vpEx -Recurse -Directory -Filter 'VoodooPS2Controller.kext' | Select-Object -First 1
     if (-not $vpSrc) { throw 'VoodooPS2Controller.kext not found' }
     Copy-Item $vpSrc.FullName (Join-Path $kexts 'VoodooPS2Controller.kext') -Recurse -Force
+
+    # --- AirportItlwm (native Intel Wi-Fi) for the installed system, one bundle per macOS ---
+    # The kext is always named AirportItlwm.kext; the macOS version lives only in the zip name.
+    # Store each as AirportItlwm-<OS>.kext so the config can reference the matching release.
+    $airport = @(
+        @{ os = 'Catalina';   dest = 'Catalina' },
+        @{ os = 'BigSur';     dest = 'BigSur' },
+        @{ os = 'Monterey';   dest = 'Monterey' },
+        @{ os = 'Ventura';    dest = 'Ventura' },
+        @{ os = 'Sonoma14.4'; dest = 'Sonoma' }
+    )
+    foreach ($a in $airport) {
+        $asset = "AirportItlwm_${AirportItlwmVersion}_stable_$($a.os).kext.zip"
+        $z = Get-Release 'OpenIntelWireless/itlwm' $AirportItlwmVersion $asset (Join-Path $cache ("airport-$($a.dest).zip"))
+        $ex = Join-Path $cache ("airport-$($a.dest)-x")
+        Expand-Into $z $ex
+        $src = Get-ChildItem $ex -Recurse -Directory -Filter 'AirportItlwm.kext' | Select-Object -First 1
+        if (-not $src) { throw "AirportItlwm.kext not found in $asset" }
+        Copy-Item $src.FullName (Join-Path $kexts "AirportItlwm-$($a.dest).kext") -Recurse -Force
+    }
 
     # --- Laptop SSDTs (EC+USBX, CPU power plug, backlight); referenced only on laptops ---
     $acpiDir = Join-Path $ocRoot 'ACPI'

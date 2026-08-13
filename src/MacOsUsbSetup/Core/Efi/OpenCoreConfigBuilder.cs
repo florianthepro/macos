@@ -34,8 +34,16 @@ public sealed class OpenCoreConfigBuilder
         var kernel = BuildKernel(needsCurrentCpuInfo, xcpmCfgLock, cpuPmCfgLock);
         if (isAmd)
             ApplyAmdPatches(kernel, hardware);
-        if (isLaptop && kernel["Add"] is object?[] baseKexts)
-            kernel["Add"] = baseKexts.Concat(LaptopInputKexts()).ToArray();
+        if (kernel["Add"] is object?[] baseKexts)
+        {
+            var kexts = baseKexts.AsEnumerable();
+            if (isLaptop)
+                kexts = kexts.Concat(LaptopInputKexts());
+            var wifi = WifiKext(release);
+            if (wifi is not null)
+                kexts = kexts.Append(wifi);
+            kernel["Add"] = kexts.ToArray();
+        }
 
         var (graphicsProperties, graphicsBootArgs) = BuildIntelGraphics(hardware, isLaptop);
 
@@ -98,6 +106,9 @@ public sealed class OpenCoreConfigBuilder
             Kext("Lilu.kext", "Contents/MacOS/Lilu"),
             Kext("VirtualSMC.kext", "Contents/MacOS/VirtualSMC"),
             Kext("WhateverGreen.kext", "Contents/MacOS/WhateverGreen"),
+            // Intel Ethernet: the reliable way to get the installer online (works in Recovery,
+            // OSBundleRequired=Network-Root). Harmless when the machine has no Intel NIC.
+            Kext("IntelMausi.kext", "Contents/MacOS/IntelMausi"),
         },
         ["Block"] = Array.Empty<object?>(),
         ["Emulate"] = D(
@@ -284,6 +295,20 @@ public sealed class OpenCoreConfigBuilder
         Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Keyboard.kext", "Contents/MacOS/VoodooPS2Keyboard"),
         Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
         Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
+    };
+
+    // Native Intel Wi-Fi (AirportItlwm) for the *installed* system, matched to the target
+    // macOS — the kext is compiled per release. Wi-Fi in the Recovery/installer itself is
+    // unreliable (reverse-engineered against Apple's private Wi-Fi stack), so wired Ethernet
+    // stays the recommended path for the install. Sequoia/Tahoe have no stable build yet.
+    private static Dictionary<string, object?>? WifiKext(MacOsRelease release) => release.DarwinMajor switch
+    {
+        19 => Kext("AirportItlwm-Catalina.kext", "Contents/MacOS/AirportItlwm"),
+        20 => Kext("AirportItlwm-BigSur.kext", "Contents/MacOS/AirportItlwm"),
+        21 => Kext("AirportItlwm-Monterey.kext", "Contents/MacOS/AirportItlwm"),
+        22 => Kext("AirportItlwm-Ventura.kext", "Contents/MacOS/AirportItlwm"),
+        23 => Kext("AirportItlwm-Sonoma.kext", "Contents/MacOS/AirportItlwm"),
+        _ => null,
     };
 
     // Intel iGPU framebuffer for the internal laptop display, resolved from the GPU's PCI
