@@ -112,6 +112,10 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
   lässt sich dort nicht abschalten; macOS würde sonst früh mit einem Kernel-Panic
   abstürzen. Der passende Quirk wird je nach CPU automatisch gesetzt
   (`AppleXcpmCfgLock` ab Haswell, sonst `AppleCpuPmCfgLock`).
+- Laptops erhalten zusätzlich `EnableWriteUnprotector` (Booter-Quirk): Stock-Laptop-
+  Firmware lässt Laufzeitspeicher schreibgeschützt, wodurch der Kernel sonst früh
+  auf einer Nur-Lese-Seite abstürzt („No mapping exists for frame pointer"). Die
+  Speicher-Quirks entsprechen der geprüften T480-Referenzkonfiguration.
 - Die iGPU-Framebuffer-ID wird anhand der PCI-Geräte-ID der Grafikeinheit
   gesetzt, nicht anhand der CPU – so wird z. B. die UHD 620 im ThinkPad T480
   (Kaby-Lake-R, `0x87C00000` + Framebuffer-Patches) von der baugleichen HD 620

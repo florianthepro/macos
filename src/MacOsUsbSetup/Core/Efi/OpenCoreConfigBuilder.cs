@@ -41,7 +41,7 @@ public sealed class OpenCoreConfigBuilder
         var config = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["ACPI"] = BuildAcpi(isLaptop),
-            ["Booter"] = BuildBooter(),
+            ["Booter"] = BuildBooter(isLaptop),
             ["DeviceProperties"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["Add"] = graphicsProperties,
@@ -70,20 +70,21 @@ public sealed class OpenCoreConfigBuilder
             ("ResetHwSig", false), ("ResetLogoStatus", true), ("SyncTableIds", false)),
     };
 
-    private static Dictionary<string, object?> BuildBooter() => new(StringComparer.Ordinal)
+    private static Dictionary<string, object?> BuildBooter(bool laptop) => new(StringComparer.Ordinal)
     {
         ["MmioWhitelist"] = Array.Empty<object?>(),
         ["Patch"] = Array.Empty<object?>(),
         ["Quirks"] = D(
             ("AllowRelocationBlock", false), ("AvoidRuntimeDefrag", true), ("DevirtualiseMmio", false),
             ("DisableSingleUser", false), ("DisableVariableWrite", false), ("DiscardHibernateMap", false),
-            ("EnableSafeModeSlide", true), ("EnableWriteUnprotector", false), ("ForceBooterSignature", false),
+            // EnableWriteUnprotector removes the write protection on runtime code/data that stock
+            // laptop firmware leaves set; without it the kernel faults writing a read-only page early
+            // in boot ("No mapping exists for frame pointer"). Reference laptop configs enable it.
+            ("EnableSafeModeSlide", true), ("EnableWriteUnprotector", laptop), ("ForceBooterSignature", false),
             ("ForceExitBootServices", false), ("ProtectMemoryRegions", false), ("ProtectSecureBoot", false),
-            // ProtectUefiServices: needed on modern firmware that tampers with UEFI services;
-            // the common fix for a hang at ExitBootServices ([EB|LOG:EXITBS:START]).
-            ("ProtectUefiServices", true), ("ProvideCustomSlide", true), ("ProvideMaxSlide", 0),
-            // RebuildAppleMemoryMap=false is the modern default and the standard fix for a hang
-            // at ExitBootServices; SetupVirtualMap + SyncRuntimePermissions cover the memory map.
+            ("ProtectUefiServices", false), ("ProvideCustomSlide", true), ("ProvideMaxSlide", 0),
+            // RebuildAppleMemoryMap=false is the modern default and the fix for a hang at
+            // ExitBootServices; SetupVirtualMap + SyncRuntimePermissions cover the memory map.
             ("RebuildAppleMemoryMap", false), ("ResizeAppleGpuBars", -1), ("SetupVirtualMap", true),
             ("SignalAppleOS", false), ("SyncRuntimePermissions", true)),
     };
