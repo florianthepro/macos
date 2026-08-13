@@ -1,0 +1,21 @@
+12:16:35 INFO  Hardware-Scan gestartet.
+12:16:35 INFO  Hardware-Scan abgeschlossen: Intel(R) Core(TM) i5-8350U CPU @ 1.70GHz, 1 Grafik-Adapter, Firmware Uefi.
+12:16:35 INFO  Kompatibilität bewertet: 6 unterstützt, 2 experimentell, 0 nicht unterstützt
+12:16:38 INFO  USB-Datenträger werden gesucht.
+12:16:38 INFO  1 USB-Datenträger gefunden.
+12:16:39 INFO  USB wird vorbereitet: USB SanDisk 3.2Gen1
+12:16:39 INFO  USB-Datenträger 1 wird vorbereitet (USB SanDisk 3.2Gen1, 30,8 GB).
+12:16:39 INFO  Datenträger 1 wird bereinigt.
+12:16:39 INFO  GPT-Partitionstabelle wird angelegt.
+12:16:39 INFO  FAT32-Partition wird erstellt und als "MACOS-USB" formatiert.
+12:16:42 ERROR diskpart schlug fehl (Exit -2147024809): Microsoft DiskPart-Version 10.0.26100.1150
+
+Copyright (C) Microsoft Corporation.
+Auf Computer: DESKTOP-5RCG7NJ
+
+Datentr ger 1 ist jetzt der gew hlte Datentr ger.
+
+Der Datentr ger wurde bereinigt.
+
+Der angegebene Datentr ger ist MBR-formiert.
+W hlen Sie einen leeren MBR-Datentr ger zum Konvertieren.
