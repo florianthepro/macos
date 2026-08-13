@@ -74,8 +74,9 @@ public static class ChunklistVerifier
         if (magic != ChunklistMagic)
             throw InvalidChunklist();
 
-        var chunkCount = BinaryPrimitives.ReadUInt64LittleEndian(header.Slice(16, 8));
-        var chunkOffset = BinaryPrimitives.ReadUInt64LittleEndian(header.Slice(24, 8));
+        // Header is packed <4sIBBBxQQQ: chunk_count@12, chunk_offset@20, signature_offset@28.
+        var chunkCount = BinaryPrimitives.ReadUInt64LittleEndian(header.Slice(12, 8));
+        var chunkOffset = BinaryPrimitives.ReadUInt64LittleEndian(header.Slice(20, 8));
 
         var end = chunkOffset + chunkCount * ChunkRecordSize;
         if (chunkOffset > (ulong)data.Length || end > (ulong)data.Length)

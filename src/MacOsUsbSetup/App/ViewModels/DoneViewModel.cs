@@ -28,6 +28,7 @@ public sealed class DoneViewModel : ViewModelBase
         "4.  Im OpenCore-Menü „macOS Base System“ starten.",
         "5.  Festplattendienstprogramm öffnen und das Ziellaufwerk als APFS löschen.",
         "6.  „macOS installieren“ wählen und dem Assistenten folgen.",
+        "7.  macOS wird dabei von Apple geladen – Internetverbindung erforderlich.",
     };
 
     public RelayCommand ShowLogCommand { get; }

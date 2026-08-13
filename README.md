@@ -68,6 +68,9 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 
 ## Hinweise
 
+- Der Stick ist recovery-basiert: Er bootet in die macOS-Wiederherstellung, die
+  macOS während der Installation von Apple lädt. Beim Installieren ist daher eine
+  Internetverbindung nötig.
 - Seriennummer/MLB in der `config.plist` sind Platzhalter. Zum Booten und
   Installieren genügt das; für iMessage/FaceTime müssen später gültige Werte
   gesetzt werden.

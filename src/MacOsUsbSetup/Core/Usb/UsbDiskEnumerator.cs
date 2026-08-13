@@ -72,6 +72,7 @@ public sealed class UsbDiskEnumerator : IUsbDiskEnumerator
     private static List<UsbDisk> FromWin32DiskDrive()
     {
         var disks = new List<UsbDisk>();
+        var systemDiskIndex = GetSystemDiskIndex();
         try
         {
             using var searcher = new ManagementObjectSearcher(
@@ -85,8 +86,9 @@ public sealed class UsbDiskEnumerator : IUsbDiskEnumerator
 
                 var number = (int)GetUint(disk, "Index");
                 var model = GetString(disk, "Model").Trim();
+                var isSystemDisk = number == systemDiskIndex;
 
-                disks.Add(new UsbDisk(number, model, size, "USB", IsRemovable: true, IsSystemDisk: false));
+                disks.Add(new UsbDisk(number, model, size, "USB", IsRemovable: true, isSystemDisk));
             }
         }
         catch (Exception ex)
@@ -95,6 +97,36 @@ public sealed class UsbDiskEnumerator : IUsbDiskEnumerator
         }
 
         return disks;
+    }
+
+    // Physical disk index that hosts the Windows drive, so the fallback path can
+    // never offer a USB-attached boot disk (Windows To Go) as a target.
+    private static int GetSystemDiskIndex()
+    {
+        try
+        {
+            var systemDrive = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows))?.TrimEnd('\\');
+            if (string.IsNullOrEmpty(systemDrive))
+                return -1;
+
+            using var partitions = new ManagementObjectSearcher(
+                $"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{systemDrive}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
+
+            foreach (var partition in partitions.Get().Cast<ManagementObject>())
+            {
+                using var drives = new ManagementObjectSearcher(
+                    $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition");
+
+                foreach (var drive in drives.Get().Cast<ManagementObject>())
+                    return (int)GetUint(drive, "Index");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"Systemdatenträger-Index konnte nicht bestimmt werden: {ex.Message}");
+        }
+
+        return -1;
     }
 
     private static string MapBusType(ushort busType) => busType switch

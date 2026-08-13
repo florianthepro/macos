@@ -31,7 +31,7 @@ public sealed class VersionViewModel : ViewModelBase
         var gpu = hardware.GraphicsAdapters.Count > 0
             ? string.Join(", ", hardware.GraphicsAdapters.Select(g => g.Name))
             : "keine Grafik erkannt";
-        var ram = hardware.TotalMemoryBytes / 1_000_000_000d;
+        var ram = hardware.TotalMemoryBytes / 1_073_741_824d;
         return $"{hardware.Processor.Brand}  ·  {gpu}  ·  {ram:0} GB RAM";
     }
 }
