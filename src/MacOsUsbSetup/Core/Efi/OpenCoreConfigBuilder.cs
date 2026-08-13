@@ -35,18 +35,20 @@ public sealed class OpenCoreConfigBuilder
         if (isLaptop && kernel["Add"] is object?[] baseKexts)
             kernel["Add"] = baseKexts.Concat(LaptopInputKexts()).ToArray();
 
+        var (graphicsProperties, graphicsBootArgs) = BuildIntelGraphics(hardware, isLaptop);
+
         var config = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["ACPI"] = BuildAcpi(isLaptop),
             ["Booter"] = BuildBooter(),
             ["DeviceProperties"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["Add"] = BuildDeviceProperties(hardware, isLaptop),
+                ["Add"] = graphicsProperties,
                 ["Delete"] = new Dictionary<string, object?>(),
             },
             ["Kernel"] = kernel,
             ["Misc"] = BuildMisc(),
-            ["NVRAM"] = BuildNvram(),
+            ["NVRAM"] = BuildNvram(graphicsBootArgs),
             ["PlatformInfo"] = BuildPlatformInfo(hardware, release),
             ["UEFI"] = BuildUefi(),
         };
@@ -134,12 +136,12 @@ public sealed class OpenCoreConfigBuilder
         ["Tools"] = Array.Empty<object?>(),
     };
 
-    private static Dictionary<string, object?> BuildNvram() => new(StringComparer.Ordinal)
+    private static Dictionary<string, object?> BuildNvram(string extraBootArgs) => new(StringComparer.Ordinal)
     {
         ["Add"] = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             [AppleBootGuid.ToString().ToUpperInvariant()] = D(
-                ("boot-args", "-v keepsyms=1 debug=0x100"),
+                ("boot-args", $"-v keepsyms=1 debug=0x100{extraBootArgs}"),
                 ("csr-active-config", new byte[] { 0x00, 0x00, 0x00, 0x00 }),
                 ("prev-lang:kbd", Encoding.ASCII.GetBytes("en-US:0")),
                 ("run-efi-updater", "No")),
@@ -280,36 +282,78 @@ public sealed class OpenCoreConfigBuilder
         Kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
     };
 
-    // Intel iGPU framebuffer for the internal laptop display, chosen by CPU generation.
-    private static Dictionary<string, object?> BuildDeviceProperties(HardwareInventory hardware, bool isLaptop)
+    // Intel iGPU framebuffer for the internal laptop display, selected from the GPU's
+    // PCI device-id. The device-id is the reliable signal: Kaby Lake and Kaby Lake-R
+    // share a CPU model but need different framebuffers. Returns the DeviceProperties
+    // "Add" map plus any extra boot-arguments. An unrecognised Intel laptop iGPU falls
+    // back to the firmware (VESA) framebuffer, so the installer still shows a picture.
+    private static (Dictionary<string, object?> Properties, string ExtraBootArgs) BuildIntelGraphics(
+        HardwareInventory hardware, bool isLaptop)
     {
         var add = new Dictionary<string, object?>(StringComparer.Ordinal);
         if (!isLaptop || hardware.Processor.Vendor != CpuVendor.Intel)
-            return add;
+            return (add, "");
 
-        byte[]? platformId = null;
-        byte[]? deviceId = null;
-        switch (hardware.Processor.Model)
-        {
-            case 78 or 94: platformId = new byte[] { 0x00, 0x00, 0x16, 0x19 }; break;            // Skylake HD 5xx -> 0x19160000
-            case 142: platformId = new byte[] { 0x00, 0x00, 0x16, 0x59 }; deviceId = new byte[] { 0x16, 0x59, 0x00, 0x00 }; break; // Kaby Lake UHD 620
-            case 158 or 165 or 166:
-                platformId = new byte[] { 0x09, 0x00, 0xA5, 0x3E }; deviceId = new byte[] { 0xA5, 0x3E, 0x00, 0x00 }; break;      // Coffee/Comet Lake UHD 630
-        }
+        var igpu = hardware.GraphicsAdapters.FirstOrDefault(g => g.Vendor == GpuVendor.Intel);
+        if (igpu is null)
+            return (add, "");
+
+        var (platformId, spoofDeviceId) = IntelFramebuffer(igpu.PciDeviceId);
         if (platformId is null)
-            return add;
+        {
+            Log.Info("Intel-iGPU nicht klassifiziert: VESA-Framebuffer (unbeschleunigt) für eine sichere Anzeige.");
+            return (add, " -igfxvesa");
+        }
 
         var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["AAPL,ig-platform-id"] = platformId,
             ["framebuffer-patch-enable"] = new byte[] { 0x01, 0x00, 0x00, 0x00 },
+            // 19 MB stolen + 9 MB framebuffer works with the 32 MB DVMT-prealloc that
+            // laptop firmware usually locks; harmless when more memory is available.
+            ["framebuffer-stolenmem"] = new byte[] { 0x00, 0x00, 0x30, 0x01 },
+            ["framebuffer-fbmem"] = new byte[] { 0x00, 0x00, 0x90, 0x00 },
         };
-        if (deviceId is not null)
-            properties["device-id"] = deviceId;
+        if (spoofDeviceId is not null)
+            properties["device-id"] = spoofDeviceId;
 
         add["PciRoot(0x0)/Pci(0x2,0x0)"] = properties;
-        return add;
+        return (add, "");
     }
+
+    // Maps an Intel iGPU PCI device-id to its OpenCore framebuffer (little-endian
+    // ig-platform-id) and, where the real part is not natively supported, a device-id
+    // to spoof to a supported one. Null means no known framebuffer.
+    private static (byte[]? PlatformId, byte[]? SpoofDeviceId) IntelFramebuffer(int deviceId)
+    {
+        bool In(int lo, int hi) => deviceId >= lo && deviceId <= hi;
+
+        // Kaby Lake-R UHD 620 (e.g. i5-8350U in a ThinkPad T480): own framebuffer,
+        // spoofed to the supported HD 620.
+        if (deviceId == 0x5917)
+            return (Le(0x87C00000), Le(0x00005916));
+
+        // Skylake HD 5xx / Iris.
+        if (In(0x1900, 0x193F))
+            return (Le(0x19160000), null);
+
+        // Kaby Lake HD 620 / UHD 620 / HD 630.
+        if (In(0x5900, 0x593F))
+            return (Le(0x59160000), null);
+
+        // Coffee Lake / Whiskey Lake / Comet Lake UHD 620 / UHD 630: shared framebuffer,
+        // spoofed to the reference UHD 630.
+        if (In(0x3E00, 0x3EFF) || In(0x9B00, 0x9BFF))
+            return (Le(0x3EA50009), Le(0x00003EA5));
+
+        return (null, null);
+    }
+
+    private static byte[] Le(uint value) => new[]
+    {
+        (byte)(value & 0xFF), (byte)((value >> 8) & 0xFF),
+        (byte)((value >> 16) & 0xFF), (byte)((value >> 24) & 0xFF),
+    };
 
     private static string ChooseSmbios(HardwareInventory hardware, MacOsRelease release)
     {
