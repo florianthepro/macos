@@ -31,9 +31,11 @@ public sealed class ScanViewModel : ViewModelBase
 
     public async Task RunAsync()
     {
-        using var mirror = new LogMirror(Log);
+        (HardwareInventory Inventory, IReadOnlyList<CompatibilityResult> Results)? outcome = null;
+        SetupException? failure = null;
         try
         {
+            using var mirror = new LogMirror(Log);
             var work = Task.Run(() =>
             {
                 var inventory = _services.HardwareScanner.Scan();
@@ -43,20 +45,19 @@ public sealed class ScanViewModel : ViewModelBase
 
             await Task.Delay(MinimumVisibleMilliseconds);
             var (inventory, results) = await work;
-
-            IsScanning = false;
-            Completed?.Invoke(inventory, results);
+            outcome = (inventory, results);
         }
-        catch (SetupException ex)
-        {
-            IsScanning = false;
-            Failed?.Invoke(ex);
-        }
+        catch (SetupException ex) { failure = ex; }
         catch (Exception ex)
         {
-            IsScanning = false;
-            Failed?.Invoke(new SetupException(SetupStage.HardwareScan,
-                "Unerwarteter Fehler bei der Hardware-Analyse.", "Protokoll ansehen.", ex));
+            failure = new SetupException(SetupStage.HardwareScan,
+                "Unerwarteter Fehler bei der Hardware-Analyse.", "Protokoll ansehen.", ex);
         }
+
+        IsScanning = false;
+        if (failure is not null)
+            Failed?.Invoke(failure);
+        else if (outcome is { } value)
+            Completed?.Invoke(value.Inventory, value.Results);
     }
 }

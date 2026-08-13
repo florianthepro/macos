@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using MacOsUsbSetup.App.Mvvm;
 using MacOsUsbSetup.App.ViewModels;
 using MacOsUsbSetup.Core.Compatibility;
@@ -16,7 +17,8 @@ public sealed class WizardViewModel : ViewModelBase
     private IReadOnlyList<CompatibilityResult> _results = Array.Empty<CompatibilityResult>();
     private ViewModelBase _currentPage = null!;
 
-    public WizardViewModel() => ShowScan();
+    // Side-effect free: build the scan page but do not start scanning until Start().
+    public WizardViewModel() => ShowScan(autoStart: false);
 
     public ViewModelBase CurrentPage
     {
@@ -24,7 +26,14 @@ public sealed class WizardViewModel : ViewModelBase
         private set => Set(ref _currentPage, value);
     }
 
-    private void ShowScan()
+    /// <summary>Begins the hardware scan. Called once the window is shown.</summary>
+    public void Start()
+    {
+        if (CurrentPage is ScanViewModel scan)
+            FireAndForget(scan.RunAsync(), "Scan");
+    }
+
+    private void ShowScan(bool autoStart = true)
     {
         var scan = new ScanViewModel(_services);
         scan.Completed += (hardware, results) =>
@@ -33,16 +42,17 @@ public sealed class WizardViewModel : ViewModelBase
             _results = results;
             ShowVersions();
         };
-        scan.Failed += error => ShowError(error, ShowScan);
+        scan.Failed += error => ShowError(error, () => ShowScan());
         CurrentPage = scan;
-        _ = scan.RunAsync();
+        if (autoStart)
+            FireAndForget(scan.RunAsync(), "Scan");
     }
 
     private void ShowVersions()
     {
         var versions = new VersionViewModel(_hardware!, _results);
         versions.ReleaseChosen += ShowUsb;
-        versions.BackRequested += ShowScan;
+        versions.BackRequested += () => ShowScan();
         CurrentPage = versions;
     }
 
@@ -60,10 +70,16 @@ public sealed class WizardViewModel : ViewModelBase
         write.Completed += () => ShowDone(plan);
         write.Failed += error => ShowError(error, () => ShowUsb(plan.Release));
         CurrentPage = write;
-        _ = write.RunAsync();
+        FireAndForget(write.RunAsync(), "Write");
     }
 
-    private void ShowDone(InstallPlan plan) => CurrentPage = new DoneViewModel(plan, ShowScan);
+    private void ShowDone(InstallPlan plan) => CurrentPage = new DoneViewModel(plan, () => ShowScan());
 
     private void ShowError(SetupException error, Action back) => CurrentPage = new ErrorViewModel(error, back);
+
+    // A discarded fire-and-forget Task hides faults; route any fault to the crash reporter.
+    private static void FireAndForget(Task task, string origin) =>
+        task.ContinueWith(
+            t => App.Report(t.Exception, origin),
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
 }

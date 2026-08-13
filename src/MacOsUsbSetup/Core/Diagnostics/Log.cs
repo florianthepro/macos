@@ -34,8 +34,17 @@ public static class Log
 
     private static string BuildLogPath()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "MacOsUsbSetup");
-        Directory.CreateDirectory(dir);
-        return Path.Combine(dir, $"setup-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        // Never let the first touch of Log throw a TypeInitializationException into
+        // an unrelated code path; fall back to a plain temp file if the dir cannot be made.
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "MacOsUsbSetup");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"setup-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        }
+        catch
+        {
+            return Path.Combine(Path.GetTempPath(), $"MacOsUsbSetup-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        }
     }
 }

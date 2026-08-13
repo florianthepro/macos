@@ -64,38 +64,36 @@ public sealed class WriteViewModel : ViewModelBase
 
     public async Task RunAsync()
     {
-        using var mirror = new LogMirror(Log);
-        var progress = new Progress<ProgressReport>(report =>
-        {
-            Fraction = report.Fraction;
-            Stage = StageText(report.Stage);
-            Detail = report.Message;
-        });
-
+        SetupException? failure = null;
+        var cancelled = false;
         try
         {
+            using var mirror = new LogMirror(Log);
+            var progress = new Progress<ProgressReport>(report =>
+            {
+                Fraction = report.Fraction;
+                Stage = StageText(report.Stage);
+                Detail = report.Message;
+            });
             await _services.CreateBuildJob().RunAsync(_plan, _hardware, progress, _cancellation.Token);
-            IsRunning = false;
-            Completed?.Invoke();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) { cancelled = true; }
+        catch (SetupException ex) { failure = ex; }
+        catch (Exception ex)
         {
-            IsRunning = false;
+            failure = new SetupException(SetupStage.RecoveryDownload,
+                "Unerwarteter Fehler beim Erstellen des USB-Datenträgers.", "Protokoll ansehen.", ex);
+        }
+
+        IsRunning = false;
+        if (cancelled)
             Failed?.Invoke(new SetupException(SetupStage.UsbPreparation,
                 "Vorgang abgebrochen – der USB-Datenträger ist unvollständig und nicht bootfähig.",
                 "Setup erneut ausführen, um den Stick vollständig zu beschreiben."));
-        }
-        catch (SetupException ex)
-        {
-            IsRunning = false;
-            Failed?.Invoke(ex);
-        }
-        catch (Exception ex)
-        {
-            IsRunning = false;
-            Failed?.Invoke(new SetupException(SetupStage.RecoveryDownload,
-                "Unerwarteter Fehler beim Erstellen des USB-Datenträgers.", "Protokoll ansehen.", ex));
-        }
+        else if (failure is not null)
+            Failed?.Invoke(failure);
+        else
+            Completed?.Invoke();
     }
 
     private static string StageText(SetupStage stage) => stage switch

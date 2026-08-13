@@ -17,7 +17,9 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- No compressed self-extractor: compression is a strong AV/SmartScreen false-positive
+         heuristic and only saves on-disk size. Larger exe, fewer launch blocks. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <!-- WPF creates the UI CultureInfo (FrameworkElement.Language, default en-US) at render
          time; globalization-invariant mode makes that throw CultureNotFoundException and the
          window never appears. Keep full globalization. -->
