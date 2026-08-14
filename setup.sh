@@ -16,6 +16,8 @@ VOODOOPS2_VERSION="2.3.7"
 INTELMAUSI_VERSION="1.0.8"
 AIRPORTITLWM_VERSION="v2.3.0"
 ALC_VERSION="1.9.2"
+IBF_VERSION="v2.4.0"      # IntelBluetoothFirmware (+ IntelBTPatcher) - Intel-BT
+BRCM_VERSION="2.7.2"      # BrcmPatchRAM-Release liefert BlueToolFixup.kext (macOS 12+)
 
 readonly OSRECOVERY="http://osrecovery.apple.com"
 readonly UA="InternetRecovery/1.0"
@@ -446,6 +448,24 @@ assemble_efi() {
     [[ -n "$alc" ]] || die EFI "AppleALC.kext nicht gefunden." "Erneut versuchen."
     cp -r "$alc" "$kexts/AppleALC.kext"
 
+    # Intel-Bluetooth ab Werk: IntelBluetoothFirmware + IntelBTPatcher (ein Zip) + BlueToolFixup
+    # (aus dem BrcmPatchRAM-Release). Zusammen mit -btlfxallowanyaddr laeuft BT ohne Nacharbeit.
+    info "Intel-Bluetooth-Kexte werden geladen (IntelBluetoothFirmware ${IBF_VERSION})"
+    fetch "https://github.com/OpenIntelWireless/IntelBluetoothFirmware/releases/download/${IBF_VERSION}/IntelBluetooth-${IBF_VERSION}.zip" "$WORK/IntelBT.zip"
+    unzip -q "$WORK/IntelBT.zip" -d "$WORK/IntelBT"
+    local ibf ibp
+    ibf=$(find "$WORK/IntelBT" -maxdepth 3 -type d -name 'IntelBluetoothFirmware.kext' | head -n1)
+    ibp=$(find "$WORK/IntelBT" -maxdepth 3 -type d -name 'IntelBTPatcher.kext' | head -n1)
+    [[ -n "$ibf" ]] || die EFI "IntelBluetoothFirmware.kext nicht gefunden." "Erneut versuchen."
+    cp -r "$ibf" "$kexts/IntelBluetoothFirmware.kext"
+    [[ -n "$ibp" ]] && cp -r "$ibp" "$kexts/IntelBTPatcher.kext"
+    info "BlueToolFixup wird geladen (BrcmPatchRAM ${BRCM_VERSION})"
+    fetch "https://github.com/acidanthera/BrcmPatchRAM/releases/download/${BRCM_VERSION}/BrcmPatchRAM-${BRCM_VERSION}-RELEASE.zip" "$WORK/Brcm.zip"
+    unzip -q "$WORK/Brcm.zip" -d "$WORK/Brcm"
+    local btf; btf=$(find "$WORK/Brcm" -maxdepth 3 -type d -name 'BlueToolFixup.kext' | head -n1)
+    [[ -n "$btf" ]] || die EFI "BlueToolFixup.kext nicht gefunden." "Erneut versuchen."
+    cp -r "$btf" "$kexts/BlueToolFixup.kext"
+
     info "Laptop-SSDTs werden geladen (EC/USBX, PLUG, PNLF)"
     mkdir -p "$efi/OC/ACPI"
     local ssdt ssdtbase="https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled"
@@ -582,6 +602,11 @@ if is_laptop:
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
         kext("AppleALC.kext", "Contents/MacOS/AppleALC"),  # Audio (mit alcid-Boot-Arg)
+        # Intel-Bluetooth ab Werk (Lilu ist bereits in den Basis-Kexten). BlueToolFixup ist ein
+        # Lilu-Plugin und limitiert sich intern auf macOS 12+; -btlfxallowanyaddr ist gesetzt.
+        kext("IntelBluetoothFirmware.kext", "Contents/MacOS/IntelBluetoothFirmware"),
+        kext("IntelBTPatcher.kext", "Contents/MacOS/IntelBTPatcher"),
+        kext("BlueToolFixup.kext", "Contents/MacOS/BlueToolFixup"),
     ]
     acpi_add = [{"Comment": "", "Enabled": True, "Path": p}
                 for p in ("SSDT-EC-USBX-LAPTOP.aml", "SSDT-PLUG-DRTNIA.aml", "SSDT-PNLF.aml")]
