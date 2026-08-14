@@ -79,7 +79,32 @@ public sealed class UsbBuildJob
         if (plan.Offline)
             await AddOfflineInstallerAsync(plan, volume, recoveryEnd, Report, ct);
 
+        WriteStartMe(volume);
+
         Report(SetupStage.Verification, 1.0, "Fertig - der USB-Stick ist bootfähig.");
+    }
+
+    // The single post-install helper (plus the keyboard layout it prefers locally) goes onto the
+    // stick root so the user can double-click it from Finder after the first macOS boot.
+    private void WriteStartMe(PreparedVolume volume)
+    {
+        var roots = new List<string> { volume.RootPath };
+        if (volume.DataRoot is { } dataRoot)
+            roots.Add(dataRoot);
+        foreach (var root in roots)
+        {
+            try
+            {
+                if (_assets.StartMeScript is { } startMe && File.Exists(startMe))
+                    File.Copy(startMe, Path.Combine(root, "start-me.command"), overwrite: true);
+                if (_assets.KeyboardLayoutFile is { } layout && File.Exists(layout))
+                    File.Copy(layout, Path.Combine(root, "Windows-German.keylayout"), overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"start-me.command konnte nicht nach {root} kopiert werden: {ex.Message}");
+            }
+        }
     }
 
     // Downloads the full installer onto the ExFAT data partition and drops the recovery-side

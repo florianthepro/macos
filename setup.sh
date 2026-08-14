@@ -860,6 +860,21 @@ PY
 
 # ------------------------------------------------------------------------ Abschluss
 
+# Der eine Nachlauf-Helfer (start-me.command) + das Tastaturlayout kommen mit auf den Stick,
+# damit der Nutzer nach dem ersten macOS-Start nur doppelklicken muss (Layout dann lokal).
+write_startme() {
+  local rawbase="https://raw.githubusercontent.com/florianthepro/macos/main"
+  curl -fsSL "$rawbase/scripts/start-me.command" -o "$MNT/start-me.command" 2>/dev/null \
+    || warn "start-me.command konnte nicht geladen werden."
+  curl -fsSL "$rawbase/assets/keyboard/Windows-German.keylayout" -o "$MNT/Windows-German.keylayout" 2>/dev/null \
+    || warn "Windows-German.keylayout konnte nicht geladen werden."
+  if [[ -n "$DATA_MNT" && -d "$DATA_MNT" ]]; then
+    cp "$MNT/start-me.command" "$DATA_MNT/start-me.command" 2>/dev/null || true
+    cp "$MNT/Windows-German.keylayout" "$DATA_MNT/Windows-German.keylayout" 2>/dev/null || true
+  fi
+  info "start-me.command auf den Stick gelegt (nach der Installation doppelklicken)"
+}
+
 finish() {
   local name; IFS=: read -r name _ <<<"$SELECTED_RELEASE"
   sync
@@ -977,6 +992,7 @@ main() {
   assemble_efi
   download_recovery
   download_installer
+  write_startme
   finish
 }
 

@@ -55,6 +55,26 @@ public sealed class EfiAssets
         }
     }
 
+    /// <summary>The single post-install helper the user double-clicks after first boot; null when absent.</summary>
+    public string? StartMeScript
+    {
+        get
+        {
+            var path = Path.Combine(_root.Value, "start-me.command");
+            return File.Exists(path) ? path : null;
+        }
+    }
+
+    /// <summary>German Windows/PC keyboard layout shipped alongside start-me.command; null when absent.</summary>
+    public string? KeyboardLayoutFile
+    {
+        get
+        {
+            var path = Path.Combine(_root.Value, "Windows-German.keylayout");
+            return File.Exists(path) ? path : null;
+        }
+    }
+
     private static string Extract()
     {
         var assembly = Assembly.GetExecutingAssembly();

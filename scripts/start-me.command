@@ -43,8 +43,15 @@ if [ -n "$esp" ]; then
 fi
 
 # ---- 2) Deutsches Windows-Tastaturlayout -------------------------------------------
+# Bevorzugt die Kopie neben diesem Skript (liegt mit auf dem Stick -> kein Internet noetig).
 DEST="/Library/Keyboard Layouts"; mkdir -p "$DEST"
-if curl -fsSL "$BASE/assets/keyboard/Windows-German.keylayout" -o "$DEST/Windows-German.keylayout" 2>/dev/null \
+HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if [ -f "$HERE/Windows-German.keylayout" ]; then
+  cp "$HERE/Windows-German.keylayout" "$DEST/Windows-German.keylayout"
+else
+  curl -fsSL "$BASE/assets/keyboard/Windows-German.keylayout" -o "$DEST/Windows-German.keylayout" 2>/dev/null
+fi
+if [ -f "$DEST/Windows-German.keylayout" ] \
    && grep -q 'code="12" output="@"' "$DEST/Windows-German.keylayout"; then
   say "- Windows-Tastaturlayout installiert (@=AltGr+Q, <>| und ^° korrekt)."
   say "  -> EINMAL auswaehlen (das Einzige, was macOS zwingend selbst verlangt):"
