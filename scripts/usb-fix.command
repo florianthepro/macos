@@ -29,11 +29,53 @@ CLS="$(ioreg -w0 -l -c AppleUSBHostController 2>/dev/null | grep -oE 'AppleUSBXH
 [ -n "$CLS" ] || CLS="AppleUSBXHCISPTLP"
 say "- Modell: $MODEL | Controller-Klasse: $CLS"
 
-# --- Portliste (T480): Name  Portnummer  UsbConnector(3=USB-A,9=USB-C,255=intern) ---
-names=(HS01 HS02 HS03 HS04 HS05 HS06 HS07 HS08 HS09 HS10 SS01 SS02 SS04)
-nums=(  1    2    3    4    5    6    7    8    9   10   13   14   16 )
-types=( 3    3   255   9   255  255  255  255  255  255   3    3    9 )
-PORTCOUNT=16
+# --- Portliste dynamisch aus dem laufenden System ermitteln (generisch, alle Modelle) ---
+# Extern = die Ports, die macOS schon enumeriert (Typ wird uebernommen).
+# Intern = deklarierte, aber uebersprungene HS-Ports -> Typ 255. Interne SS werden ausgelassen.
+# Fallback: bewaehrtes T480-Layout, falls die Erkennung nichts Brauchbares liefert.
+PORTLINES="$(/usr/bin/python3 - 2>/dev/null <<'PY'
+import subprocess, re
+def sh(*a):
+    try: return subprocess.run(a,capture_output=True,text=True,timeout=20).stdout
+    except: return ""
+acpi = sh('ioreg','-p','IOACPIPlane','-w0','-r','-n','XHC')
+ports=[]; seen=set()
+for name,addr in re.findall(r'-o ((?:HS|SS)\d\d)@([0-9a-fx]+)', acpi):
+    try: n=int(addr,16)
+    except: continue
+    if name in seen: continue
+    seen.add(name); ports.append((name,n))
+svc = sh('ioreg','-w0','-l','-rc','AppleUSB20XHCIPort','-rc','AppleUSB30XHCIPort')
+enum={}
+for blk in re.split(r'\+-o ', svc):
+    m=re.search(r'"(?:port|usb-port-number)"\s*=\s*<([0-9a-fA-F]{2})', blk)
+    if not m: continue
+    num=int(m.group(1),16)
+    t=re.search(r'"(?:UsbConnector|usb-port-type)"\s*=\s*(\d+)', blk)
+    enum[num]= int(t.group(1)) if t else 3
+ext=[]; intr=[]
+for name,n in ports:
+    if n in enum:
+        ty=enum[n]; ty = ty if ty in (0,3,8,9) else 3
+        ext.append((name,n,ty))
+    elif name.startswith('HS'):
+        intr.append((name,n,255))
+final=(ext+intr)[:15]
+if len(final)>=6 and any(t==255 for _,_,t in final) and ext:
+    for name,n,t in final: print(name,n,t)
+PY
+)"
+names=(); nums=(); types=(); PORTCOUNT=0
+if [ -n "$PORTLINES" ]; then
+  while read -r nm nu ty; do [ -n "$nm" ] || continue; names+=("$nm"); nums+=("$nu"); types+=("$ty"); [ "$nu" -gt "$PORTCOUNT" ] && PORTCOUNT="$nu"; done <<< "$PORTLINES"
+  say "- Ports dynamisch erkannt (${#names[@]} Stueck)."
+else
+  say "- Dynamische Erkennung ohne Ergebnis -> T480-Standardlayout."
+  names=(HS01 HS02 HS03 HS04 HS05 HS06 HS07 HS08 HS09 HS10 SS01 SS02 SS04)
+  nums=(  1    2    3    4    5    6    7    8    9   10   13   14   16 )
+  types=( 3    3   255   9   255  255  255  255  255  255   3    3    9 )
+  PORTCOUNT=16
+fi
 
 b64(){ printf "$(printf '\\x%02x\\x00\\x00\\x00' "$1")" | base64; }  # Portnummer -> 4-Byte-LE-Data (base64)
 
