@@ -218,7 +218,17 @@ ist einmaliges **USB-Mapping** nötig (unten).
 Neu erzeugte Sticks brauchen die Boot-Feinschliff-Punkte nicht mehr: `LegacyEnable`
 wird nicht länger geschrieben, die interne EFI-Kopie bootet nach dem Offline-Install
 direkt ohne Auswahlbildschirm durch, und `-btlfxallowanyaddr` ist für Laptops von
-Haus aus gesetzt. USB-Port-Mapping bleibt hardwarespezifisch und damit manuell.
+Haus aus gesetzt.
+
+**USB-Portmap ab Werk (ThinkPad T480-Familie):** Erkennt das Werkzeug die
+UHD-620-iGPU (`0x5917`, Kaby-Lake-R – T480/T480s/T490 usw.), legt es automatisch
+eine passende `USBMap.kext` in die EFI: die internen Ports (Kamera, Bluetooth,
+Fingerprint) werden als **Typ 255 (intern)** deklariert, sodass macOS sie ab dem
+ersten Boot enumeriert – **kein** Nach-Mapping nötig. Andere Modelle bekommen
+keine (potenziell falsche) Map ab Werk; dort baut `scripts/usb-fix.command`
+die Map **generisch aus dem laufenden System** (extern = bereits enumeriert,
+interne HS-Ports → Typ 255) und trägt sie sicher ein. `camera.command`/
+`bluetooth.command` rufen `usb-fix.command` bei Bedarf selbst auf.
 
 ## Rechtliches
 

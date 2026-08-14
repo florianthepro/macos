@@ -586,6 +586,37 @@ if is_laptop:
     acpi_add = [{"Comment": "", "Enabled": True, "Path": p}
                 for p in ("SSDT-EC-USBX-LAPTOP.aml", "SSDT-PLUG-DRTNIA.aml", "SSDT-PNLF.aml")]
 
+# USB-Portmap fuer die T480-Familie (UHD 620 / Kaby-Lake-R, iGPU 0x5917): die internen Ports
+# (Kamera/Bluetooth/Fingerprint) werden von Lenovo als "nicht anschliessbar" markiert, sodass
+# macOS sie ueberspringt. Eine codeless USBMap.kext deklariert sie als Typ 255 (intern) und zwingt
+# so die Enumeration - Kamera + BT laufen ab dem ersten Boot, ohne Nacharbeit. Nur fuer dieses
+# Layout aktiv; andere Modelle nutzen scripts/usb-fix.command (liest die Ports live aus).
+if is_laptop and igpu_dev == 0x5917:
+    import os
+    _pm = [("HS01", 1, 3), ("HS02", 2, 3), ("HS03", 3, 255), ("HS04", 4, 9), ("HS05", 5, 255),
+           ("HS06", 6, 255), ("HS07", 7, 255), ("HS08", 8, 255), ("HS09", 9, 255), ("HS10", 10, 255),
+           ("SS01", 13, 3), ("SS02", 14, 3), ("SS04", 16, 9)]
+    _pd = lambda n: bytes([n & 0xFF, 0, 0, 0])
+    _ports, _top = {}, 0
+    for _nm, _num, _ty in _pm:
+        _ports[_nm] = {"UsbConnector": _ty, "port": _pd(_num), "usb-port-number": _pd(_num), "usb-port-type": _ty}
+        _top = max(_top, _num)
+    _usbmap = {
+        "CFBundleIdentifier": "com.corpnewt.USBMap", "CFBundleInfoDictionaryVersion": "6.0",
+        "CFBundleName": "USBMap", "CFBundlePackageType": "KEXT", "CFBundleShortVersionString": "1.0",
+        "CFBundleVersion": "1.0", "OSBundleRequired": "Root",
+        "IOKitPersonalities": {smbios + "-XHC": {
+            "CFBundleIdentifier": "com.apple.driver.AppleUSBHostMergeProperties",
+            "IOClass": "AppleUSBHostMergeProperties", "IONameMatch": "XHC",
+            "IOProviderClass": "AppleUSBXHCISPTLP", "model": smbios,
+            "IOProviderMergeProperties": {"kUSBMuxEnabled": True, "port-count": _pd(_top), "ports": _ports}}},
+    }
+    _kdir = os.path.join(os.path.dirname(out), "Kexts", "USBMap.kext", "Contents")
+    os.makedirs(_kdir, exist_ok=True)
+    with open(os.path.join(_kdir, "Info.plist"), "wb") as _f:
+        plistlib.dump(_usbmap, _f)
+    kernel["Add"].append(kext("USBMap.kext", ""))
+
 def le(v):
     return bytes([v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF])
 
