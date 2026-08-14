@@ -605,10 +605,14 @@ if is_laptop and igpu_dev == 0x5917:
         "CFBundleIdentifier": "com.corpnewt.USBMap", "CFBundleInfoDictionaryVersion": "6.0",
         "CFBundleName": "USBMap", "CFBundlePackageType": "KEXT", "CFBundleShortVersionString": "1.0",
         "CFBundleVersion": "1.0", "OSBundleRequired": "Root",
+        # macOS baut USB-Ports aus Controller-Registern + SMBIOS-Werks-Map (nicht aus ACPI): die
+        # Merge-Kext muss den XHC ueber seine PCI-Adresse (pcidebug 0:20:0 = 00:14.0) treffen und
+        # die Werks-Map ueberstimmen (IOProbeScore). IONameMatch/AppleUSBXHCISPTLP binden NICHT.
         "IOKitPersonalities": {smbios + "-XHC": {
             "CFBundleIdentifier": "com.apple.driver.AppleUSBHostMergeProperties",
-            "IOClass": "AppleUSBHostMergeProperties", "IONameMatch": "XHC",
-            "IOProviderClass": "AppleUSBXHCISPTLP", "model": smbios,
+            "IOClass": "AppleUSBHostMergeProperties", "IOProviderClass": "AppleUSBHostController",
+            "IOProbeScore": 5000, "IOParentMatch": {"IOPropertyMatch": {"pcidebug": "0:20:0"}},
+            "model": smbios,
             "IOProviderMergeProperties": {"kUSBMuxEnabled": True, "port-count": _pd(_top), "ports": _ports}}},
     }
     _kdir = os.path.join(os.path.dirname(out), "Kexts", "USBMap.kext", "Contents")

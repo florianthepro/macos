@@ -25,9 +25,12 @@ cp "$CFG" "$CFG.fixbak" || { say "Backup fehlgeschlagen"; exit 1; }
 
 # Modell + XHCI-Controller-Klasse ermitteln (fuer korrektes Matching, ohne Thunderbolt-Controller)
 MODEL="$(sysctl -n hw.model 2>/dev/null)"; [ -n "$MODEL" ] || MODEL="MacBookPro14,1"
-CLS="$(ioreg -w0 -l -c AppleUSBHostController 2>/dev/null | grep -oE 'AppleUSBXHCI[A-Za-z]+' | grep -viE 'AR$' | sort -u | head -1)"
-[ -n "$CLS" ] || CLS="AppleUSBXHCISPTLP"
-say "- Modell: $MODEL | Controller-Klasse: $CLS"
+# WICHTIG: macOS baut die USB-Ports aus den Controller-Registern + einer SMBIOS-Werks-Portmap,
+# NICHT aus ACPI. Die Merge-Kext muss den Controller ueber seine PCI-Adresse (pcidebug) treffen
+# und die Werks-Map ueberstimmen. T480: XHC = PCI 00:14.0 -> "0:20:0". Live gelesen, Fallback 0:20:0.
+PCIDBG="$(ioreg -rxn XHC -w0 2>/dev/null | grep -i 'pcidebug' | grep -oE '[0-9]+:[0-9]+:[0-9]+' | head -1)"
+[ -n "$PCIDBG" ] || PCIDBG="0:20:0"
+say "- Modell: $MODEL | XHC pcidebug: $PCIDBG"
 
 # --- Portliste dynamisch aus dem laufenden System ermitteln (generisch, alle Modelle) ---
 # Extern = die Ports, die macOS schon enumeriert (Typ wird uebernommen).
@@ -100,8 +103,10 @@ cat <<HEAD
         <dict>
             <key>CFBundleIdentifier</key><string>com.apple.driver.AppleUSBHostMergeProperties</string>
             <key>IOClass</key><string>AppleUSBHostMergeProperties</string>
-            <key>IONameMatch</key><string>XHC</string>
-            <key>IOProviderClass</key><string>${CLS}</string>
+            <key>IOProviderClass</key><string>AppleUSBHostController</string>
+            <key>IOProbeScore</key><integer>5000</integer>
+            <key>IOParentMatch</key>
+            <dict><key>IOPropertyMatch</key><dict><key>pcidebug</key><string>${PCIDBG}</string></dict></dict>
             <key>model</key><string>${MODEL}</string>
             <key>IOProviderMergeProperties</key>
             <dict>
