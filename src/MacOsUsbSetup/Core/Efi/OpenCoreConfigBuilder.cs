@@ -38,8 +38,20 @@ public sealed class OpenCoreConfigBuilder
         {
             var kexts = baseKexts.AsEnumerable();
             if (isLaptop)
+            {
                 kexts = kexts.Concat(LaptopInputKexts())
-                    .Append(Kext("AppleALC.kext", "Contents/MacOS/AppleALC")); // audio (with alcid boot-arg)
+                    .Append(Kext("AppleALC.kext", "Contents/MacOS/AppleALC"))                     // audio (with alcid boot-arg)
+                    .Append(Kext("IntelBluetoothFirmware.kext", "Contents/MacOS/IntelBluetoothFirmware")) // Intel-BT (Lilu is a base kext)
+                    .Append(Kext("IntelBTPatcher.kext", "Contents/MacOS/IntelBTPatcher"))
+                    .Append(Kext("BlueToolFixup.kext", "Contents/MacOS/BlueToolFixup"));           // BT on macOS 12+ (-btlfxallowanyaddr set)
+                // USB port map baked in for the T480 family (UHD 620 / Kaby-Lake-R, iGPU 0x5917):
+                // internal camera/BT ports as connector type 255, so they enumerate from first boot.
+                // The codeless USBMap.kext ships in the payload (see build.ps1). Other models: the
+                // post-install scripts/usb-fix.command builds the map generically from the live system.
+                var intelIgpu = hardware.GraphicsAdapters.FirstOrDefault(g => g.Vendor == GpuVendor.Intel);
+                if (intelIgpu is not null && intelIgpu.PciDeviceId == 0x5917)
+                    kexts = kexts.Append(Kext("USBMap.kext", "")); // codeless (empty ExecutablePath)
+            }
             var wifi = WifiKext(release);
             if (wifi is not null)
                 kexts = kexts.Append(wifi);

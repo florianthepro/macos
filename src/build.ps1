@@ -25,7 +25,9 @@ param(
     [string]$VoodooPS2Version = '2.3.7',
     [string]$IntelMausiVersion = '1.0.8',
     [string]$AirportItlwmVersion = 'v2.3.0',
-    [string]$AppleAlcVersion = '1.9.2'
+    [string]$AppleAlcVersion = '1.9.2',
+    [string]$IntelBtVersion  = 'v2.4.0',
+    [string]$BrcmVersion     = '2.7.2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -100,6 +102,15 @@ function Build-Payload {
     if (Test-Path $offlineScript) { Copy-Item $offlineScript (Join-Path $staging 'offline-install.command') -Force }
     else { Write-Warning 'offline-install.command not found' }
 
+    # The one post-install file + the keyboard layout -> payload root, so setup.exe can drop them
+    # onto the stick for the user to double-click after first boot.
+    $startMe = Join-Path $root 'scripts/start-me.command'
+    if (Test-Path $startMe) { Copy-Item $startMe (Join-Path $staging 'start-me.command') -Force }
+    else { Write-Warning 'start-me.command not found' }
+    $keylayout = Join-Path $root 'assets/keyboard/Windows-German.keylayout'
+    if (Test-Path $keylayout) { Copy-Item $keylayout (Join-Path $staging 'Windows-German.keylayout') -Force }
+    else { Write-Warning 'Windows-German.keylayout not found' }
+
     $ocRoot   = Join-Path $efi 'OC'
     $drivers  = Join-Path $ocRoot 'Drivers'
     $kexts    = Join-Path $ocRoot 'Kexts'
@@ -137,6 +148,69 @@ function Build-Payload {
     $vpSrc = Get-ChildItem $vpEx -Recurse -Directory -Filter 'VoodooPS2Controller.kext' | Select-Object -First 1
     if (-not $vpSrc) { throw 'VoodooPS2Controller.kext not found' }
     Copy-Item $vpSrc.FullName (Join-Path $kexts 'VoodooPS2Controller.kext') -Recurse -Force
+
+    # --- Intel Bluetooth (IntelBluetoothFirmware + IntelBTPatcher in one zip) + BlueToolFixup ---
+    $btZip = Get-Release 'OpenIntelWireless/IntelBluetoothFirmware' $IntelBtVersion "IntelBluetooth-$IntelBtVersion.zip" (Join-Path $cache 'intelbt.zip')
+    $btEx  = Join-Path $cache 'intelbt-x'; Expand-Into $btZip $btEx
+    foreach ($bk in 'IntelBluetoothFirmware.kext','IntelBTPatcher.kext') {
+        $s = Get-ChildItem $btEx -Recurse -Directory -Filter $bk | Select-Object -First 1
+        if (-not $s) { throw "$bk not found" }
+        Copy-Item $s.FullName (Join-Path $kexts $bk) -Recurse -Force
+    }
+    $brcmZip = Get-Release 'acidanthera/BrcmPatchRAM' $BrcmVersion "BrcmPatchRAM-$BrcmVersion-RELEASE.zip" (Join-Path $cache 'brcm.zip')
+    $brcmEx  = Join-Path $cache 'brcm-x'; Expand-Into $brcmZip $brcmEx
+    $btf = Get-ChildItem $brcmEx -Recurse -Directory -Filter 'BlueToolFixup.kext' | Select-Object -First 1
+    if (-not $btf) { throw 'BlueToolFixup.kext not found' }
+    Copy-Item $btf.FullName (Join-Path $kexts 'BlueToolFixup.kext') -Recurse -Force
+
+    # --- USBMap.kext (codeless) for the ThinkPad T480 family: internal camera/BT ports as type 255.
+    # Config references it only when the iGPU is 0x5917 (UHD 620). model is omitted so it applies on
+    # whatever SMBIOS setup.exe chooses; IOParentMatch pcidebug 0:20:0 (00:14.0) + IOProbeScore win. ---
+    $um = Join-Path $kexts 'USBMap.kext/Contents'
+    New-Item -ItemType Directory -Force -Path $um | Out-Null
+    function PortData([int]$n) { [Convert]::ToBase64String([byte[]]@($n,0,0,0)) }
+    $ports = @(
+        @('HS01',1,3),@('HS02',2,3),@('HS03',3,255),@('HS04',4,9),@('HS05',5,255),@('HS06',6,255),
+        @('HS07',7,255),@('HS08',8,255),@('HS09',9,255),@('HS10',10,255),@('SS01',13,3),@('SS02',14,3),@('SS04',16,9)
+    )
+    $portXml = ($ports | ForEach-Object {
+        "                    <key>$($_[0])</key>`n                    <dict><key>UsbConnector</key><integer>$($_[2])</integer><key>port</key><data>$(PortData $_[1])</data><key>usb-port-number</key><data>$(PortData $_[1])</data><key>usb-port-type</key><integer>$($_[2])</integer></dict>"
+    }) -join "`n"
+    @"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.corpnewt.USBMap</string>
+    <key>CFBundleName</key><string>USBMap</string>
+    <key>CFBundlePackageType</key><string>KEXT</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleVersion</key><string>1.0</string>
+    <key>OSBundleRequired</key><string>Root</string>
+    <key>IOKitPersonalities</key>
+    <dict>
+        <key>T480-XHC</key>
+        <dict>
+            <key>CFBundleIdentifier</key><string>com.apple.driver.AppleUSBHostMergeProperties</string>
+            <key>IOClass</key><string>AppleUSBHostMergeProperties</string>
+            <key>IOProviderClass</key><string>AppleUSBHostController</string>
+            <key>IOProbeScore</key><integer>5000</integer>
+            <key>IOParentMatch</key>
+            <dict><key>IOPropertyMatch</key><dict><key>pcidebug</key><string>0:20:0</string></dict></dict>
+            <key>IOProviderMergeProperties</key>
+            <dict>
+                <key>kUSBMuxEnabled</key><true/>
+                <key>port-count</key><data>$(PortData 16)</data>
+                <key>ports</key>
+                <dict>
+$portXml
+                </dict>
+            </dict>
+        </dict>
+    </dict>
+</dict>
+</plist>
+"@ | Set-Content -Path (Join-Path $um 'Info.plist') -Encoding UTF8
 
     # --- AirportItlwm (native Intel Wi-Fi) for the installed system, one bundle per macOS ---
     # The kext is always named AirportItlwm.kext; the macOS version lives only in the zip name.

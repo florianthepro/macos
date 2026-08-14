@@ -70,9 +70,9 @@ bis zur jeweils für die Hardware sinnvollen Version.
   `start-me.command` (der eine Nachlauf), `usb-fix.command` (USB‑Portmap generisch),
   `keyboard.command` (nur Layout), `camera.command` / `bluetooth.command`
   (Einzelgeräte), `usb-test.command` / `hw-diagnose.command` (nur lesende Diagnose),
-  `offline-install.command` (Recovery‑Installer), `ssdt-install.command` /
-  `usb-map-install.command` / `postinstall-fixes.command` / `polish-fixes.command`
-  (Fortgeschrittene/Altlasten). Das Tastaturlayout liegt in `assets/keyboard/`.
+  `offline-install.command` (Recovery‑Installer), `usb-map-install.command` /
+  `postinstall-fixes.command` / `polish-fixes.command` (Fortgeschrittene/Altlasten).
+  Das Tastaturlayout liegt in `assets/keyboard/`.
 - **Bauen:** Windows `build.bat` (→ `publish\setup.exe`) bzw. Linux `sudo ./setup.sh`.
   `src/build.ps1` bündelt OpenCore/Kexte/macserial ins eingebettete `efi-payload.zip`.
 
