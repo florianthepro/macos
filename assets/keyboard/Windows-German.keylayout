@@ -44,7 +44,7 @@
 			<key code="7" output="x"/>
 			<key code="8" output="c"/>
 			<key code="9" output="v"/>
-			<key code="10" output="^"/>
+			<key code="50" output="^"/>
 			<key code="11" output="b"/>
 			<key code="12" output="q"/>
 			<key code="13" output="w"/>
@@ -84,7 +84,7 @@
 			<key code="47" output="."/>
 			<key code="48" output="&#x0009;"/>
 			<key code="49" output=" "/>
-			<key code="50" output="&#x003C;"/>
+			<key code="10" output="&#x003C;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -150,7 +150,7 @@
 			<key code="7" output="X"/>
 			<key code="8" output="C"/>
 			<key code="9" output="V"/>
-			<key code="10" output="°"/>
+			<key code="50" output="°"/>
 			<key code="11" output="B"/>
 			<key code="12" output="Q"/>
 			<key code="13" output="W"/>
@@ -190,7 +190,7 @@
 			<key code="47" output=":"/>
 			<key code="48" output="&#x0009;"/>
 			<key code="49" output=" "/>
-			<key code="50" output="&#x003E;"/>
+			<key code="10" output="&#x003E;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -233,7 +233,7 @@
 		<keyMap index="2">
 			<key code="0" output=""/>
 			<key code="8" output="©"/>
-			<key code="10" output="|"/>
+			<key code="50" output="|"/>
 			<key code="12" output="@"/>
 			<key code="14" output="€"/>
 			<key code="15" output="®"/>
@@ -247,7 +247,7 @@
 			<key code="30" output="~"/>
 			<key code="36" output="&#x000D;"/>
 			<key code="48" output="&#x0009;"/>
-			<key code="50" output="|"/>
+			<key code="10" output="|"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -298,7 +298,7 @@
 			<key code="7" output="X"/>
 			<key code="8" output="C"/>
 			<key code="9" output="V"/>
-			<key code="10" output="^"/>
+			<key code="50" output="^"/>
 			<key code="11" output="B"/>
 			<key code="12" output="Q"/>
 			<key code="13" output="W"/>
@@ -338,7 +338,7 @@
 			<key code="47" output=":"/>
 			<key code="48" output="&#x0009;"/>
 			<key code="49" output=" "/>
-			<key code="50" output="&#x003E;"/>
+			<key code="10" output="&#x003E;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
