@@ -49,13 +49,21 @@ ls -1 "$ACPIDIR" 2>/dev/null | sed 's/^/  /'
 say ""; say "### 7) Kernel:Quirks:XhciPortLimit"
 $PB -c "Print :Kernel:Quirks:XhciPortLimit" "$CFG" 2>/dev/null | sed 's/^/  /'
 
-say ""; say "### 8) OpenCore-Log: ACPI/SSDT/Patch-Zeilen (falls Log vorhanden)"
+say ""; say "### 8) OpenCore-Log: ACPI/SSDT/Patch-Zeilen (als Text gelesen)"
 log="$(ls -t "$mp"/opencore-*.txt "$mp"/EFI/opencore-*.txt 2>/dev/null | head -n1)"
 if [ -n "$log" ]; then
   say "  Log: $log"
-  grep -iE 'OCA:|SSDT|patch|RHUB|_STA|XSTA|acpi' "$log" 2>/dev/null | head -n 40 | sed 's/^/  /'
+  # -a: Log enthaelt Steuerzeichen -> als Text behandeln. Relevante ACPI-Zeilen zeigen.
+  LC_ALL=C grep -a -iE 'OCA:|OCABlock|SSDT|RHUB|_STA|XSTA|ACPI.*(patch|table)|Patch.*(succ|fail|count)' "$log" 2>/dev/null \
+    | LC_ALL=C tr -cd '\11\12\15\40-\176\200-\377' | head -n 60 | sed 's/^/  /'
 else
   say "  (kein opencore-*.txt gefunden - Datei-Logging evtl. aus; Misc>Debug>Target)"
 fi
+
+say ""; say "### 9) ACPI-Baum unter XHC / RHUB (welche Port-Geraete die Firmware deklariert)"
+ioreg -p IOACPIPlane -w0 2>/dev/null \
+  | grep -iE 'XHC|RHUB|(HS|SS|USR|HUB|PRT|CAM|BTH)[0-9A-Z]?' | head -n 45 | sed 's/^/  /'
+say "  --- Zusammenzaehlung ---"
+ioreg -p IOACPIPlane -w0 2>/dev/null | grep -icE '\+-o (HS|SS)[0-9]' | sed 's/^/  Port-Geraete unter ACPI (HSxx\/SSxx): /'
 
 hr; say "FERTIG - bitte den GESAMTEN Text oben kopieren und mir schicken."; hr
