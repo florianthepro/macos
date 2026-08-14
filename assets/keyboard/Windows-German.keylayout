@@ -2,7 +2,7 @@
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
 <!--Created by Ukelele version 2.2.4 on 2013-06-10 at 22:23 (CEST)-->
 <!--Last edited by Ukelele version 3.0.3.70 on 2016-05-31 at 17:44 (MESZ)-->
-<keyboard group="0" id="4711" name="Deutsch – Windows (ThinkPad)" maxout="1">
+<keyboard group="0" id="-8480" name="Deutsch – Windows (ThinkPad)" maxout="1">
 	<layouts>
 		<layout first="0" last="17" mapSet="ANSI" modifiers="Modifiers"/>
 		<layout first="18" last="18" mapSet="JIS" modifiers="Modifiers"/>
