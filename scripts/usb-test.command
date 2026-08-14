@@ -60,9 +60,16 @@ else
   say "  (kein opencore-*.txt gefunden - Datei-Logging evtl. aus; Misc>Debug>Target)"
 fi
 
-say ""; say "### 9) ACPI-Baum unter XHC / RHUB (welche Port-Geraete die Firmware deklariert)"
-ioreg -p IOACPIPlane -w0 2>/dev/null \
-  | grep -iE 'XHC|RHUB|(HS|SS|USR|HUB|PRT|CAM|BTH)[0-9A-Z]?' | head -n 45 | sed 's/^/  /'
+say ""; say "### 9) XHC-Subtree: ALLE Port-Geraete mit Adresse (Name@Adr)"
+# Zeigt jeden Port, den die Firmware deklariert - auch die von macOS uebersprungenen
+# internen (Kamera/BT). Format z.B. 'HS03@5' = Portname @ ACPI-Adresse.
+ioreg -p IOACPIPlane -w0 -r -n XHC 2>/dev/null \
+  | grep -oE '[A-Za-z0-9]{2,5}@[0-9a-fx]+ +<class IOACPIPlatformDevice' \
+  | sed -E 's/ +<class.*//' | sed 's/^/  /'
+say "  --- separat: RHUB-Subtrees ---"
+ioreg -p IOACPIPlane -w0 -r -n RHUB 2>/dev/null \
+  | grep -oE '[A-Za-z0-9]{2,5}@[0-9a-fx]+ +<class IOACPIPlatformDevice' \
+  | sed -E 's/ +<class.*//' | sed 's/^/  /'
 say "  --- Zusammenzaehlung ---"
 ioreg -p IOACPIPlane -w0 2>/dev/null | grep -icE '\+-o (HS|SS)[0-9]' | sed 's/^/  Port-Geraete unter ACPI (HSxx\/SSxx): /'
 
