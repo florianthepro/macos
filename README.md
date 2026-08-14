@@ -163,60 +163,62 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 
 ## Nachbesserung im installierten System (`scripts/…`)
 
-Optionale Skripte fürs bereits laufende macOS. Die EFI-ändernden laufen mit
-`sudo bash <datei>` und machen immer Backup + `plutil`-Prüfung (bei Fehler
-automatischer Rückbau):
+Optionale Skripte fürs bereits laufende macOS, generisch für ThinkPad-/Lenovo-
+Modelle. Alle EFI-ändernden laufen mit `sudo bash <datei>` und machen immer
+Backup + `plutil`-Prüfung mit automatischem Rückbau; Rettungsweg ist immer der
+USB-Stick (bootet unabhängig).
 
-- **`scripts/postinstall-fixes.command`** – trägt Ton (AppleALC) und die
-  Bluetooth-Kexte in die interne EFI ein und setzt die Boot-args `alcid=11`
-  (Audio) und `-btlfxallowanyaddr` (Intel-BT bei NULL-Adresse).
-- **`scripts/polish-fixes.command`** – Feinschliff: entfernt den veralteten
-  `LegacyEnable`-Schlüssel (Boot-Meldung „OCS: No schema for LegacyEnable"),
-  schaltet den OpenCore-/Recovery-Auswahlbildschirm ab (`ShowPicker=false`,
-  direkt durchbooten) und sorgt für einen sauberen Apple-Logo-Boot.
-- **`scripts/keyboard-iso-fix.command`** – sauberer, dauerhafter Tastatur-Fix
-  **ohne** Fremdsoftware: entfernt einen evtl. früher gesetzten hidutil-Swap und
-  lässt macOS die Tastatur als **ISO** erkennen (Tastatur-Einrichtungsassistent).
-  Danach stimmen **alle** Tasten – nicht nur „<>|"/„^°" – und zwar **pro Tastatur
-  getrennt**: interne + externe Windows-Tastaturen als ISO, eine Apple-ANSI-
-  Tastatur bleibt ANSI. Das ist der Wurzel-Fix; der frühere globale Zwei-Tasten-
-  Swap konnte eine korrekt erkannte Apple-Tastatur verdrehen. (Wer lieber eine
-  App möchte: **Karabiner-Elements** kann dasselbe per Regel, installiert aber
-  einen dauerhaften Treiber.)
+### Die drei Geräte-Skripte
 
-### Kamera & Bluetooth: erst diagnostizieren, dann gezielt fixen
+- **`scripts/keyboard.command`** – macht die **komplette** deutsche Tastatur
+  richtig: installiert das deutsche **Windows/PC-Layout** (`@` = AltGr+Q, dazu
+  `€ [] {} \ | ~ ² ³ µ` genau wie aufgedruckt) und entfernt den früheren
+  `hidutil`-Swap – das Layout deckt `<>|` und `^°` selbst ab (beides zusammen
+  würde doppelt vertauschen). Danach in *Systemeinstellungen → Tastatur →
+  Eingabequellen* „Deutsch – Windows (ThinkPad)" auswählen. Das Layout liegt
+  unter `assets/keyboard/`.
+- **`scripts/bluetooth.command`** – trägt die Intel-BT-Kexte (Lilu,
+  IntelBluetoothFirmware, IntelBTPatcher, BlueToolFixup) + den Boot-arg
+  `-btlfxallowanyaddr` ein. Ist das BT-USB-Modul (VID `0x8087`) nicht sichtbar,
+  macht es zusätzlich den **USB-Reveal** (siehe unten).
+- **`scripts/camera.command`** – interne UVC-Kamera braucht keinen Treiber; das
+  Skript sorgt nur dafür, dass ihr interner USB-Port sichtbar ist (**USB-Reveal**).
+  Vorher im BIOS *I/O Port Access → Integrated Camera = On* und ThinkShutter auf.
 
-Interne Kamera und Intel-Bluetooth hängen beide am **internen USB-Bus**. Fehlt
-eines/beides, ist die Ursache **nicht** immer dieselbe – blindes USB-Mapping kann
-sogar funktionierende Ports (Fingerprint, SD, externe Buchsen) *rauswerfen*, weil
-eine Map-Kext eine Positivliste ist. Deshalb zuerst messen:
+### USB-Reveal (Kamera & Bluetooth hängen am internen USB-Bus)
 
-1. **`scripts/hw-diagnose.command`** (nur lesend, kein `sudo`) sagt pro Gerät, ob
-   es am USB-Bus auftaucht, welche Kexte geladen sind und was der nächste Schritt
-   ist. Vorher im BIOS (F1) unter *Security → I/O Port Access* **Integrated
-   Camera** und **Bluetooth** aktivieren, `Fn`+`F8` (Funk an) und den ThinkShutter
-   öffnen.
-2. **Bluetooth-Modul ist sichtbar, BT aber aus** → meist fehlt nur der Boot-arg:
-   **`scripts/bt-anyaddr.command`** ergänzt `-btlfxallowanyaddr`. Kein USB-Mapping
-   nötig.
-3. **Kamera und/oder BT fehlen komplett am USB** (obwohl im BIOS aktiv) → das ist
-   das 15-Port-Limit; dann **USB-Port-Mapping** nötig. Da rein hardwarespezifisch,
-   läuft es interaktiv **direkt in macOS** mit CorpNewt **USBMap**
-   (`https://github.com/corpnewt/USBMap`): `./USBMap.command` → *Discover Ports* →
-   interne Kamera (Chicony/Bison/Sunplus) und Intel-BT (VID `0x8087`) als
-   **connector type 255 (internal)** aktivieren, jede externe Buchse einmal mit
-   USB2- **und** USB3-Gerät antippen, ≤ 15 Personalities je Controller behalten,
-   `USBMap.kext` bauen. Die gebaute Kext dann sicher einspielen mit
-   **`scripts/usb-map-install.command`** (`sudo bash usb-map-install.command
-   [pfad/USBMap.kext]`): Backup, Eintrag in `Kernel→Add` (codeless), Entfernen der
-   Discovery-Hilfskext, `XhciPortLimit=false` und `plutil`-Prüfung. `XhciPortLimit`
-   bleibt **aus** (unter Ventura ohnehin unzuverlässig).
+Fehlt Kamera oder BT komplett am USB, deklariert die Firmware macOS nur einen
+Teil der Ports. `camera.command`/`bluetooth.command` lösen das **generisch**:
+sie lesen die RHUB-ACPI-Pfade des Geräts automatisch aus, erzeugen einen dazu
+passenden **RHUB-Reset-SSDT** + einen `Base`-scoped `_STA→XSTA`-Rename (`Count 1`,
+trifft nur den jeweiligen RHUB) und tragen beides sicher ein. Danach baut macOS
+die Ports aus der Hardware neu auf. Zeigt der Controller danach **>15 Ports**,
+ist einmaliges **USB-Mapping** nötig (unten).
 
-Neu erzeugte Sticks brauchen die ersten Punkte nicht mehr: `LegacyEnable` wird
-nicht länger geschrieben, die auf die interne Platte kopierte EFI bootet nach dem
-Offline-Install direkt ohne Auswahlbildschirm durch, und `-btlfxallowanyaddr` ist
-für Laptops von Haus aus gesetzt. USB-Port-Mapping bleibt hardwarespezifisch und
-damit ein bewusst manueller Schritt.
+### Weitere Helfer
+
+- **`scripts/hw-diagnose.command`** – nur lesend (kein `sudo`): sagt pro Gerät,
+  ob es am USB-Bus auftaucht, welche Kexte geladen sind und was der nächste
+  Schritt ist.
+- **`scripts/postinstall-fixes.command`** – Ton (AppleALC) + Boot-args
+  (`alcid=11`, `-btlfxallowanyaddr`) für bestehende Installationen.
+- **`scripts/polish-fixes.command`** – Boot-Feinschliff für ältere Installationen:
+  entfernt `LegacyEnable` (Boot-Meldung „OCS: No schema for LegacyEnable"),
+  schaltet den Auswahlbildschirm ab (`ShowPicker=false`) und sorgt für sauberen
+  Apple-Logo-Boot.
+- **`scripts/ssdt-install.command`** – installiert eine `.aml` (z. B. einen manuell
+  mit USBMap `H` erzeugten RHUB-Reset) sicher in `EFI/OC/ACPI` + `ACPI→Add`.
+- **`scripts/usb-map-install.command`** – spielt eine mit **USBMap** gebaute
+  `USBMap.kext` sicher ein (codeless `Kernel→Add`, `XhciPortLimit=false`). Nötig,
+  wenn ein Controller **>15 Ports** hat: USBMap → *Discover Ports* → interne Kamera
+  (Chicony/Bison/Sunplus) und Intel-BT (`0x8087`) als **Typ 255 (internal)**
+  behalten, jede externe Buchse mit USB2- **und** USB3-Gerät antippen,
+  ≤ 15 Personalities je Controller, `USBMap.kext` bauen.
+
+Neu erzeugte Sticks brauchen die Boot-Feinschliff-Punkte nicht mehr: `LegacyEnable`
+wird nicht länger geschrieben, die interne EFI-Kopie bootet nach dem Offline-Install
+direkt ohne Auswahlbildschirm durch, und `-btlfxallowanyaddr` ist für Laptops von
+Haus aus gesetzt. USB-Port-Mapping bleibt hardwarespezifisch und damit manuell.
 
 ## Rechtliches
 
