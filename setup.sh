@@ -626,9 +626,10 @@ if is_laptop and igpu_dev is not None:
         device_props = {"PciRoot(0x0)/Pci(0x2,0x0)": props}
 
 # Sauberer Boot (Apple-Logo statt Verbose-Text). alcid=<n> aktiviert AppleALC-Audio auf Laptops
-# (11 als erster Versuch; ggf. anderen Wert probieren). "-v keepsyms=1 debug=0x100" hier ergaenzen,
-# um einen Boot-Haenger zu diagnostizieren.
-boot_args = (("alcid=11 " if is_laptop else "") + extra_boot_args.strip()).strip()
+# (11 als erster Versuch; ggf. anderen Wert probieren). -btlfxallowanyaddr laesst BlueToolFixup
+# das Intel-Bluetooth auch bei NULL-Adresse (Ventura+) akzeptieren. "-v keepsyms=1 debug=0x100"
+# hier ergaenzen, um einen Boot-Haenger zu diagnostizieren.
+boot_args = (("alcid=11 -btlfxallowanyaddr " if is_laptop else "") + extra_boot_args.strip()).strip()
 
 config = {
     "ACPI": {"Add": acpi_add, "Delete": [], "Patch": [],

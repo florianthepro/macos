@@ -163,23 +163,58 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
 
 ## Nachbesserung im installierten System (`scripts/…`)
 
-Zwei optionale Skripte fürs bereits laufende macOS (jeweils `sudo bash <datei>`,
-mit Backup + Validierung der `config.plist`, bei Fehler automatischer Rückbau):
+Optionale Skripte fürs bereits laufende macOS. Die EFI-ändernden laufen mit
+`sudo bash <datei>` und machen immer Backup + `plutil`-Prüfung (bei Fehler
+automatischer Rückbau):
 
 - **`scripts/postinstall-fixes.command`** – trägt Ton (AppleALC) und die
-  Bluetooth-Kexte in die interne EFI ein und setzt `alcid=11`.
+  Bluetooth-Kexte in die interne EFI ein und setzt die Boot-args `alcid=11`
+  (Audio) und `-btlfxallowanyaddr` (Intel-BT bei NULL-Adresse).
 - **`scripts/polish-fixes.command`** – Feinschliff: entfernt den veralteten
   `LegacyEnable`-Schlüssel (Boot-Meldung „OCS: No schema for LegacyEnable"),
   schaltet den OpenCore-/Recovery-Auswahlbildschirm ab (`ShowPicker=false`,
-  direkt durchbooten), sorgt für einen sauberen Apple-Logo-Boot und dreht den
-  ISO-Tastatur-Swap zurück, damit die Taste „<>|" wieder `<>|` statt `^°`
-  erzeugt (persistent per LaunchDaemon, gilt für interne, externe Windows- und
-  Apple-Tastaturen). Braucht man den Picker doch einmal, bootet der USB-Stick
-  weiterhin mit Auswahl.
+  direkt durchbooten) und sorgt für einen sauberen Apple-Logo-Boot.
+- **`scripts/keyboard-iso-fix.command`** – sauberer, dauerhafter Tastatur-Fix
+  **ohne** Fremdsoftware: entfernt einen evtl. früher gesetzten hidutil-Swap und
+  lässt macOS die Tastatur als **ISO** erkennen (Tastatur-Einrichtungsassistent).
+  Danach stimmen **alle** Tasten – nicht nur „<>|"/„^°" – und zwar **pro Tastatur
+  getrennt**: interne + externe Windows-Tastaturen als ISO, eine Apple-ANSI-
+  Tastatur bleibt ANSI. Das ist der Wurzel-Fix; der frühere globale Zwei-Tasten-
+  Swap konnte eine korrekt erkannte Apple-Tastatur verdrehen. (Wer lieber eine
+  App möchte: **Karabiner-Elements** kann dasselbe per Regel, installiert aber
+  einen dauerhaften Treiber.)
 
-Neu erzeugte Sticks brauchen diese Nachbesserung nicht mehr: `LegacyEnable`
-wird nicht länger geschrieben, und die auf die interne Platte kopierte EFI
-bootet nach dem Offline-Install direkt ohne Auswahlbildschirm durch.
+### Kamera & Bluetooth: erst diagnostizieren, dann gezielt fixen
+
+Interne Kamera und Intel-Bluetooth hängen beide am **internen USB-Bus**. Fehlt
+eines/beides, ist die Ursache **nicht** immer dieselbe – blindes USB-Mapping kann
+sogar funktionierende Ports (Fingerprint, SD, externe Buchsen) *rauswerfen*, weil
+eine Map-Kext eine Positivliste ist. Deshalb zuerst messen:
+
+1. **`scripts/hw-diagnose.command`** (nur lesend, kein `sudo`) sagt pro Gerät, ob
+   es am USB-Bus auftaucht, welche Kexte geladen sind und was der nächste Schritt
+   ist. Vorher im BIOS (F1) unter *Security → I/O Port Access* **Integrated
+   Camera** und **Bluetooth** aktivieren, `Fn`+`F8` (Funk an) und den ThinkShutter
+   öffnen.
+2. **Bluetooth-Modul ist sichtbar, BT aber aus** → meist fehlt nur der Boot-arg:
+   **`scripts/bt-anyaddr.command`** ergänzt `-btlfxallowanyaddr`. Kein USB-Mapping
+   nötig.
+3. **Kamera und/oder BT fehlen komplett am USB** (obwohl im BIOS aktiv) → das ist
+   das 15-Port-Limit; dann **USB-Port-Mapping** nötig. Da rein hardwarespezifisch,
+   läuft es interaktiv **direkt in macOS** mit CorpNewt **USBMap**
+   (`https://github.com/corpnewt/USBMap`): `./USBMap.command` → *Discover Ports* →
+   interne Kamera (Chicony/Bison/Sunplus) und Intel-BT (VID `0x8087`) als
+   **connector type 255 (internal)** aktivieren, jede externe Buchse einmal mit
+   USB2- **und** USB3-Gerät antippen, ≤ 15 Personalities je Controller behalten,
+   `USBMap.kext` bauen und in `EFI/OC/Kexts` + `Kernel→Add` legen (am sichersten
+   per **ProperTree → OC Clean Snapshot**). `XhciPortLimit` bleibt dabei **aus**
+   (unter Ventura ohnehin unzuverlässig).
+
+Neu erzeugte Sticks brauchen die ersten Punkte nicht mehr: `LegacyEnable` wird
+nicht länger geschrieben, die auf die interne Platte kopierte EFI bootet nach dem
+Offline-Install direkt ohne Auswahlbildschirm durch, und `-btlfxallowanyaddr` ist
+für Laptops von Haus aus gesetzt. USB-Port-Mapping bleibt hardwarespezifisch und
+damit ein bewusst manueller Schritt.
 
 ## Rechtliches
 

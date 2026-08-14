@@ -52,15 +52,18 @@ add IntelBluetoothFirmware.kext "Contents/MacOS/IntelBluetoothFirmware"
 add IntelBTPatcher.kext "Contents/MacOS/IntelBTPatcher"
 add BlueToolFixup.kext "Contents/MacOS/BlueToolFixup"
 
-# 4. Audio-Boot-Arg alcid=11 ergaenzen (falls noch nicht vorhanden)
+# 4. Boot-args ergaenzen: alcid=11 (Audio) + -btlfxallowanyaddr (Intel-BT bei NULL-Adresse)
 BA="7C436110-AB2A-4BBB-A880-FE41995C9F82"
-cur="$(/usr/libexec/PlistBuddy -c "Print :NVRAM:Add:$BA:boot-args" "$CFG" 2>/dev/null)"
-case "$cur" in
-  *alcid=*) : ;;
-  *) newv="alcid=11${cur:+ $cur}"
-     /usr/libexec/PlistBuddy -c "Set :NVRAM:Add:$BA:boot-args $newv" "$CFG" 2>/dev/null \
-       || /usr/libexec/PlistBuddy -c "Add :NVRAM:Add:$BA:boot-args string alcid=11" "$CFG" ;;
-esac
+addarg(){ # token needle
+  local tok="$1" needle="$2" c
+  c="$(/usr/libexec/PlistBuddy -c "Print :NVRAM:Add:$BA:boot-args" "$CFG" 2>/dev/null)"
+  case "$c" in *"$needle"*) return 0 ;; esac
+  local n="$tok${c:+ $c}"
+  /usr/libexec/PlistBuddy -c "Set :NVRAM:Add:$BA:boot-args $n" "$CFG" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :NVRAM:Add:$BA:boot-args string $tok" "$CFG" 2>/dev/null
+}
+addarg "alcid=11" "alcid="
+addarg "-btlfxallowanyaddr" "-btlfxallowanyaddr"
 
 # 5. Validieren -> bei Fehler Backup zurueck
 /usr/bin/plutil -convert xml1 "$CFG" >/dev/null 2>&1

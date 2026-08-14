@@ -159,12 +159,17 @@ public sealed class OpenCoreConfigBuilder
     };
 
     // Boot-args: clean by default; alcid enables AppleALC audio on laptops (11 is a common first
-    // try, user-tweakable), plus any graphics fallback such as -igfxvesa.
+    // try, user-tweakable); -btlfxallowanyaddr lets BlueToolFixup accept the Intel Bluetooth
+    // controller on Ventura+ even when it reports a NULL address (common on Intel laptop radios),
+    // plus any graphics fallback such as -igfxvesa.
     private static string BuildBootArgs(bool laptop, string graphicsBootArgs)
     {
         var parts = new List<string>();
         if (laptop)
+        {
             parts.Add("alcid=11");
+            parts.Add("-btlfxallowanyaddr");
+        }
         var graphics = graphicsBootArgs.Trim();
         if (graphics.Length > 0)
             parts.Add(graphics);
