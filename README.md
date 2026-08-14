@@ -161,6 +161,26 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
   Meldung samt Empfehlung. Vollständiges Protokoll:
   `%TEMP%\MacOsUsbSetup\setup-*.log`.
 
+## Nachbesserung im installierten System (`scripts/…`)
+
+Zwei optionale Skripte fürs bereits laufende macOS (jeweils `sudo bash <datei>`,
+mit Backup + Validierung der `config.plist`, bei Fehler automatischer Rückbau):
+
+- **`scripts/postinstall-fixes.command`** – trägt Ton (AppleALC) und die
+  Bluetooth-Kexte in die interne EFI ein und setzt `alcid=11`.
+- **`scripts/polish-fixes.command`** – Feinschliff: entfernt den veralteten
+  `LegacyEnable`-Schlüssel (Boot-Meldung „OCS: No schema for LegacyEnable"),
+  schaltet den OpenCore-/Recovery-Auswahlbildschirm ab (`ShowPicker=false`,
+  direkt durchbooten), sorgt für einen sauberen Apple-Logo-Boot und dreht den
+  ISO-Tastatur-Swap zurück, damit die Taste „<>|" wieder `<>|` statt `^°`
+  erzeugt (persistent per LaunchDaemon, gilt für interne, externe Windows- und
+  Apple-Tastaturen). Braucht man den Picker doch einmal, bootet der USB-Stick
+  weiterhin mit Auswahl.
+
+Neu erzeugte Sticks brauchen diese Nachbesserung nicht mehr: `LegacyEnable`
+wird nicht länger geschrieben, und die auf die interne Platte kopierte EFI
+bootet nach dem Offline-Install direkt ohne Auswahlbildschirm durch.
+
 ## Rechtliches
 
 macOS ist Apple vorbehalten; die Installation auf Nicht-Apple-Hardware verstößt

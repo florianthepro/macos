@@ -77,7 +77,17 @@ if [ -n "$efisrc" ]; then
     diskutil mount "/dev/$esp" >/dev/null 2>&1
     espmp="$(diskutil info "/dev/$esp" 2>/dev/null | awk -F': *' '/Mount Point/{print $2; exit}' | sed 's/[[:space:]]*$//')"
     if [ -n "$espmp" ]; then
-      if ditto "$efisrc" "$espmp/EFI"; then say "- OpenCore auf interne EFI kopiert ($espmp/EFI)."
+      if ditto "$efisrc" "$espmp/EFI"; then
+        say "- OpenCore auf interne EFI kopiert ($espmp/EFI)."
+        # Sauberer Boot auf dem installierten System: Picker aus, kurzer Timeout.
+        # (Der USB-Stick behaelt seinen Picker fuers Installieren; nur die interne
+        #  Kopie bootet direkt durch.)
+        icfg="$espmp/EFI/EFI/OC/config.plist"; [ -f "$icfg" ] || icfg="$espmp/EFI/OC/config.plist"
+        if [ -f "$icfg" ]; then
+          /usr/libexec/PlistBuddy -c "Set :Misc:Boot:ShowPicker false" "$icfg" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Set :Misc:Boot:Timeout 2" "$icfg" 2>/dev/null
+          /usr/bin/plutil -lint "$icfg" >/dev/null 2>&1 || say "  (Hinweis: Picker-Anpassung uebersprungen)"
+        fi
       else say "!! EFI-Kopie fehlgeschlagen - Stick beim Installieren eingesteckt lassen."; fi
     fi
   fi

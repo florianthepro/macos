@@ -667,7 +667,7 @@ config = {
                           {"DefaultBackgroundColor": b"\x00\x00\x00\x00", "UIScale": b"\x01"}},
               "Delete": {"7C436110-AB2A-4BBB-A880-FE41995C9F82": ["boot-args", "csr-active-config"],
                          "4D1EDE05-38C7-4A6A-9CC6-4BCCA8B38C14": ["DefaultBackgroundColor", "UIScale"]},
-              "LegacyEnable": False, "LegacySchema": {}, "WriteFlash": True},
+              "LegacySchema": {}, "WriteFlash": True},
     "PlatformInfo": {"Automatic": True, "CustomMemory": False,
                      "Generic": {"AdviseFeatures": False,
                                  "MLB": gen_mlb or secrets.token_hex(8).upper()[:17].ljust(17, "0"),

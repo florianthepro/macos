@@ -191,7 +191,6 @@ public sealed class OpenCoreConfigBuilder
             [AppleBootGuid.ToString().ToUpperInvariant()] = new object?[] { "boot-args", "csr-active-config" },
             [AppleGuiGuid.ToString().ToUpperInvariant()] = new object?[] { "DefaultBackgroundColor", "UIScale" },
         },
-        ["LegacyEnable"] = false,
         ["LegacySchema"] = new Dictionary<string, object?>(),
         ["WriteFlash"] = true,
     };
