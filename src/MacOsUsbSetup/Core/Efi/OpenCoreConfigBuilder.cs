@@ -57,7 +57,7 @@ public sealed class OpenCoreConfigBuilder
                 ["Delete"] = new Dictionary<string, object?>(),
             },
             ["Kernel"] = kernel,
-            ["Misc"] = BuildMisc(),
+            ["Misc"] = BuildMisc(isLaptop),
             ["NVRAM"] = BuildNvram(graphicsBootArgs),
             ["PlatformInfo"] = BuildPlatformInfo(hardware, release),
             ["UEFI"] = BuildUefi(),
@@ -129,12 +129,15 @@ public sealed class OpenCoreConfigBuilder
             ("CustomKernel", false), ("FuzzyMatch", true), ("KernelArch", "Auto"), ("KernelCache", "Auto")),
     };
 
-    private static Dictionary<string, object?> BuildMisc() => new(StringComparer.Ordinal)
+    private static Dictionary<string, object?> BuildMisc(bool laptop) => new(StringComparer.Ordinal)
     {
         ["BlessOverride"] = Array.Empty<object?>(),
         ["Boot"] = D(
             ("ConsoleAttributes", 0), ("HibernateMode", "None"), ("HibernateSkipsPicker", false),
-            ("HideAuxiliary", false), ("InstanceIdentifier", ""), ("LauncherOption", "Disabled"),
+            // Short (not Full) registers a firmware boot entry that Insyde/Lenovo laptops tolerate,
+            // helping the internal disk boot OpenCore standalone after install. Needs
+            // RequestBootVarRouting=true (set). The \EFI\BOOT\BOOTx64.efi fallback remains the guarantee.
+            ("HideAuxiliary", false), ("InstanceIdentifier", ""), ("LauncherOption", laptop ? "Short" : "Disabled"),
             ("LauncherPath", "Default"), ("PickerAttributes", 17), ("PickerAudioAssist", false),
             ("PickerMode", "Builtin"), ("PickerVariant", "Auto"), ("PollAppleHotKeys", true),
             ("ShowPicker", true), ("TakeoffDelay", 0), ("Timeout", 10)),
