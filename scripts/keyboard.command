@@ -7,7 +7,7 @@
 set -o pipefail
 say(){ printf '%s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { say "Bitte mit sudo starten:  sudo bash \"$0\""; exit 1; }
-BASE="https://raw.githubusercontent.com/florianthepro/macos/claude/macos-usb-installer-exe-bfvxsy"
+BASE="https://raw.githubusercontent.com/florianthepro/macos/main"
 
 # 1) Frueheren hidutil-Swap restlos entfernen (Layout macht das jetzt komplett)
 D=/Library/LaunchDaemons/com.local.keyboard-iso-fix.plist

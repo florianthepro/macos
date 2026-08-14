@@ -8,7 +8,7 @@
 set -o pipefail
 say(){ printf '%s\n' "$*"; }
 [ "$(id -u)" = 0 ] || exec sudo bash "$0" "$@"   # sich selbst mit Administratorrechten neu starten
-BASE="https://raw.githubusercontent.com/florianthepro/macos/claude/macos-usb-installer-exe-bfvxsy"
+BASE="https://raw.githubusercontent.com/florianthepro/macos/main"
 NEEDREBOOT=0
 
 say "=============================================================="

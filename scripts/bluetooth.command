@@ -7,7 +7,7 @@ set -o pipefail
 say(){ printf '%s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { say "Bitte mit sudo starten:  sudo bash \"$0\""; exit 1; }
 PB=/usr/libexec/PlistBuddy
-BASE="https://raw.githubusercontent.com/florianthepro/macos/claude/macos-usb-installer-exe-bfvxsy"
+BASE="https://raw.githubusercontent.com/florianthepro/macos/main"
 
 say "Voraussetzung: BIOS (F1) Security > I/O Port Access > Bluetooth/Wireless = On, Fn+F8 (Funk an)."
 say ""
