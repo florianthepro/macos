@@ -37,9 +37,10 @@ Grafik und Tastatur sind – soweit macOS es zulässt – **ab Werk** dabei.
 | **WLAN / Ethernet** | ab Werk (AirportItlwm / IntelMausi) |
 | **Ton** (Lautsprecher/Mikro) | ab Werk (AppleALC) |
 | **Grafik** | ab Werk (iGPU‑Framebuffer je Geräte‑ID) |
+| **Batterieanzeige** | ab Werk (SMCBatteryManager + ECEnabler); bestehende Systeme: `scripts/battery.command` |
 | **Kamera + Bluetooth** | ab Werk auf der **T480‑Familie**; sonst richtet `start-me.command` die USB‑Portmap automatisch ein |
 | **Tastatur** | Windows‑Layout via `start-me.command` – nur die Eingabequelle einmal anklicken |
-| **iMessage/FaceTime** | gültige Seriennummern ab Werk (Apple verlangt fallweise eine einmalige Freischaltung) |
+| **iMessage/FaceTime** | gültige Seriennummern ab Werk; `scripts/imessage.command` setzt die ROM auf die echte MAC und führt durch die Anmeldung (Apple verlangt fallweise eine einmalige Freischaltung) |
 
 macOS‑Versionen: die Fixes sind **nicht** versionsgebunden und laufen von Big Sur
 bis zur jeweils für die Hardware sinnvollen Version.
