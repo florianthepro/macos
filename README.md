@@ -206,9 +206,11 @@ eine Map-Kext eine Positivliste ist. Deshalb zuerst messen:
    interne Kamera (Chicony/Bison/Sunplus) und Intel-BT (VID `0x8087`) als
    **connector type 255 (internal)** aktivieren, jede externe Buchse einmal mit
    USB2- **und** USB3-Gerät antippen, ≤ 15 Personalities je Controller behalten,
-   `USBMap.kext` bauen und in `EFI/OC/Kexts` + `Kernel→Add` legen (am sichersten
-   per **ProperTree → OC Clean Snapshot**). `XhciPortLimit` bleibt dabei **aus**
-   (unter Ventura ohnehin unzuverlässig).
+   `USBMap.kext` bauen. Die gebaute Kext dann sicher einspielen mit
+   **`scripts/usb-map-install.command`** (`sudo bash usb-map-install.command
+   [pfad/USBMap.kext]`): Backup, Eintrag in `Kernel→Add` (codeless), Entfernen der
+   Discovery-Hilfskext, `XhciPortLimit=false` und `plutil`-Prüfung. `XhciPortLimit`
+   bleibt **aus** (unter Ventura ohnehin unzuverlässig).
 
 Neu erzeugte Sticks brauchen die ersten Punkte nicht mehr: `LegacyEnable` wird
 nicht länger geschrieben, die auf die interne Platte kopierte EFI bootet nach dem

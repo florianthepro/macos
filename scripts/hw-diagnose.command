@@ -62,8 +62,10 @@ fi
 
 # =========================================================== USB-PORT-UEBERBLICK
 hr; say "== USB-PORTS (Limit: 15 Personalities pro Controller) =="
-PORTS="$(ioreg -p IOUSB 2>/dev/null | grep -cE '@[0-9]')"
-say "Sichtbare USB-Knoten (grob): ${PORTS:-?}"
+DEVS="$(printf '%s' "$USB" | grep -cE 'Product ID:')"
+PORTS="$(ioreg -rc AppleUSBHostPort 2>/dev/null | grep -c AppleUSBHostPort)"
+say "Angeschlossene USB-Geraete (SPUSBDataType): ${DEVS:-0}"
+say "Enumerierte USB-Ports (ioreg): ${PORTS:-0}"
 say "Fehlen Kamera UND Bluetooth am USB, obwohl im BIOS aktiv, ist das das"
 say "typische 15-Port-Limit -> USB-Mapping (USBMap.command) loest beide zugleich."
 hr
