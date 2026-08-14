@@ -38,7 +38,8 @@ public sealed class OpenCoreConfigBuilder
         {
             var kexts = baseKexts.AsEnumerable();
             if (isLaptop)
-                kexts = kexts.Concat(LaptopInputKexts());
+                kexts = kexts.Concat(LaptopInputKexts())
+                    .Append(Kext("AppleALC.kext", "Contents/MacOS/AppleALC")); // audio (with alcid boot-arg)
             var wifi = WifiKext(release);
             if (wifi is not null)
                 kexts = kexts.Append(wifi);
@@ -46,6 +47,7 @@ public sealed class OpenCoreConfigBuilder
         }
 
         var (graphicsProperties, graphicsBootArgs) = BuildIntelGraphics(hardware, isLaptop);
+        var bootArgs = BuildBootArgs(isLaptop, graphicsBootArgs);
 
         var config = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -58,7 +60,7 @@ public sealed class OpenCoreConfigBuilder
             },
             ["Kernel"] = kernel,
             ["Misc"] = BuildMisc(isLaptop),
-            ["NVRAM"] = BuildNvram(graphicsBootArgs),
+            ["NVRAM"] = BuildNvram(bootArgs),
             ["PlatformInfo"] = BuildPlatformInfo(hardware, release),
             ["UEFI"] = BuildUefi(),
         };
@@ -144,7 +146,9 @@ public sealed class OpenCoreConfigBuilder
         ["Debug"] = D(
             ("AppleDebug", true), ("ApplePanic", true), ("DisableWatchDog", true), ("DisplayDelay", 0),
             // Target 67 also writes opencore-*.txt to the USB root for diagnostics.
-            ("DisplayLevel", 2147483650L), ("LogModules", "*"), ("SysReport", false), ("Target", 67)),
+            // Target 65 (0x41) = enable + log to file, WITHOUT the on-screen console spam (0x02).
+            // opencore-*.txt is still written to the ESP for diagnostics.
+            ("DisplayLevel", 2147483650L), ("LogModules", "*"), ("SysReport", false), ("Target", 65)),
         ["Entries"] = Array.Empty<object?>(),
         ["Security"] = D(
             ("AllowSetDefault", true), ("ApECID", 0), ("AuthRestart", false), ("BlacklistAppleUpdate", true),
@@ -154,12 +158,27 @@ public sealed class OpenCoreConfigBuilder
         ["Tools"] = Array.Empty<object?>(),
     };
 
-    private static Dictionary<string, object?> BuildNvram(string extraBootArgs) => new(StringComparer.Ordinal)
+    // Boot-args: clean by default; alcid enables AppleALC audio on laptops (11 is a common first
+    // try, user-tweakable), plus any graphics fallback such as -igfxvesa.
+    private static string BuildBootArgs(bool laptop, string graphicsBootArgs)
+    {
+        var parts = new List<string>();
+        if (laptop)
+            parts.Add("alcid=11");
+        var graphics = graphicsBootArgs.Trim();
+        if (graphics.Length > 0)
+            parts.Add(graphics);
+        return string.Join(" ", parts);
+    }
+
+    private static Dictionary<string, object?> BuildNvram(string bootArgs) => new(StringComparer.Ordinal)
     {
         ["Add"] = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             [AppleBootGuid.ToString().ToUpperInvariant()] = D(
-                ("boot-args", $"-v keepsyms=1 debug=0x100{extraBootArgs}"),
+                // Clean boot (Apple logo, no verbose text). Add "-v keepsyms=1 debug=0x100" to
+                // diagnose a boot hang/panic.
+                ("boot-args", bootArgs),
                 ("csr-active-config", new byte[] { 0x00, 0x00, 0x00, 0x00 }),
                 ("prev-lang:kbd", Encoding.ASCII.GetBytes("en-US:0")),
                 ("run-efi-updater", "No")),

@@ -106,9 +106,17 @@ Festplattendienstprogramm das Ziel als APFS löschen und macOS installieren.
   gesetzt werden.
 - AMD-Ryzen wird über die AMD-Vanilla-Kernel-Patches unterstützt (automatisch
   auf die Kernanzahl gesetzt).
-- Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), die Basis-SSDTs
-  (EC/USBX, PLUG, PNLF) und einen passenden MacBookPro-SMBIOS. OpenCore schreibt
-  zusätzlich ein Protokoll (`opencore-*.txt`) auf den USB-Stick.
+- Laptops erhalten automatisch VoodooPS2 (Tastatur/Trackpad), AppleALC (Audio),
+  die Basis-SSDTs (EC/USBX, PLUG, PNLF) und einen passenden MacBookPro-SMBIOS.
+  OpenCore schreibt zusätzlich ein Protokoll (`opencore-*.txt`) auf den USB-Stick.
+- Der Boot ist standardmäßig **sauber** (Apple-Logo, kein Verbose-Text); das
+  OpenCore-Log geht weiter als Datei (`Target=65`). Für die Fehlersuche bei einem
+  Boot-Hänger `-v keepsyms=1 debug=0x100` in `boot-args` ergänzen.
+- **Audio:** Für Laptops wird `alcid=11` als erster Versuch gesetzt. Falls kein Ton:
+  anderen Wert testen (T480 z. B. 11, 13, 21, 22, 27, 28, 29) – in `boot-args`
+  `alcid=<n>` ändern.
+- **SMBIOS-Serien** werden mit macserial modellrichtig erzeugt (iMessage-Basis;
+  Apple verlangt fallweise eine einmalige Freischaltung).
 - **Offline-Installer (kein Netz beim Installieren):** Optional (im USB-Schritt bzw.
   per Menü in `setup.sh`, ab macOS Big Sur, 32-GB-Stick). Der Stick bekommt eine
   zweite ExFAT-Partition mit dem kompletten `InstallAssistant.pkg` von Apple. Die

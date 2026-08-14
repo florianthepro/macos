@@ -24,7 +24,8 @@ param(
     [string]$WhateverGreenVersion = '1.7.0',
     [string]$VoodooPS2Version = '2.3.7',
     [string]$IntelMausiVersion = '1.0.8',
-    [string]$AirportItlwmVersion = 'v2.3.0'
+    [string]$AirportItlwmVersion = 'v2.3.0',
+    [string]$AppleAlcVersion = '1.9.2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -117,7 +118,8 @@ function Build-Payload {
         @{ repo = 'acidanthera/Lilu';          tag = $LiluVersion;          asset = "Lilu-$LiluVersion-RELEASE.zip";                   pick = 'Lilu.kext' },
         @{ repo = 'acidanthera/VirtualSMC';     tag = $VirtualSmcVersion;    asset = "VirtualSMC-$VirtualSmcVersion-RELEASE.zip";       pick = 'VirtualSMC.kext' },
         @{ repo = 'acidanthera/WhateverGreen';  tag = $WhateverGreenVersion; asset = "WhateverGreen-$WhateverGreenVersion-RELEASE.zip"; pick = 'WhateverGreen.kext' },
-        @{ repo = 'acidanthera/IntelMausi';     tag = $IntelMausiVersion;    asset = "IntelMausi-$IntelMausiVersion-RELEASE.zip";       pick = 'IntelMausi.kext' }
+        @{ repo = 'acidanthera/IntelMausi';     tag = $IntelMausiVersion;    asset = "IntelMausi-$IntelMausiVersion-RELEASE.zip";       pick = 'IntelMausi.kext' },
+        @{ repo = 'acidanthera/AppleALC';       tag = $AppleAlcVersion;      asset = "AppleALC-$AppleAlcVersion-RELEASE.zip";           pick = 'AppleALC.kext' }
     )
     foreach ($k in $kextSources) {
         $z = Get-Release $k.repo $k.tag $k.asset (Join-Path $cache ($k.pick + '.zip'))

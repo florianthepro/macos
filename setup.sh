@@ -15,6 +15,7 @@ WEG_VERSION="1.7.0"
 VOODOOPS2_VERSION="2.3.7"
 INTELMAUSI_VERSION="1.0.8"
 AIRPORTITLWM_VERSION="v2.3.0"
+ALC_VERSION="1.9.2"
 
 readonly OSRECOVERY="http://osrecovery.apple.com"
 readonly UA="InternetRecovery/1.0"
@@ -438,6 +439,13 @@ assemble_efi() {
     [[ -n "$vps" ]] || die EFI "VoodooPS2Controller.kext nicht gefunden." "Erneut versuchen."
     cp -r "$vps" "$kexts/VoodooPS2Controller.kext"
 
+    info "AppleALC ${ALC_VERSION} wird geladen (Audio: Lautsprecher/Mikro)"
+    fetch "https://github.com/acidanthera/AppleALC/releases/download/${ALC_VERSION}/AppleALC-${ALC_VERSION}-RELEASE.zip" "$WORK/AppleALC.zip"
+    unzip -q "$WORK/AppleALC.zip" -d "$WORK/AppleALC"
+    local alc; alc=$(find "$WORK/AppleALC" -maxdepth 3 -type d -name 'AppleALC.kext' | head -n1)
+    [[ -n "$alc" ]] || die EFI "AppleALC.kext nicht gefunden." "Erneut versuchen."
+    cp -r "$alc" "$kexts/AppleALC.kext"
+
     info "Laptop-SSDTs werden geladen (EC/USBX, PLUG, PNLF)"
     mkdir -p "$efi/OC/ACPI"
     local ssdt ssdtbase="https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled"
@@ -573,6 +581,7 @@ if is_laptop:
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Keyboard.kext", "Contents/MacOS/VoodooPS2Keyboard"),
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
+        kext("AppleALC.kext", "Contents/MacOS/AppleALC"),  # Audio (mit alcid-Boot-Arg)
     ]
     acpi_add = [{"Comment": "", "Enabled": True, "Path": p}
                 for p in ("SSDT-EC-USBX-LAPTOP.aml", "SSDT-PLUG-DRTNIA.aml", "SSDT-PNLF.aml")]
@@ -616,7 +625,10 @@ if is_laptop and igpu_dev is not None:
             props["framebuffer-cursormem"] = b"\x00\x00\x90\x00"
         device_props = {"PciRoot(0x0)/Pci(0x2,0x0)": props}
 
-boot_args = "-v keepsyms=1 debug=0x100" + extra_boot_args
+# Sauberer Boot (Apple-Logo statt Verbose-Text). alcid=<n> aktiviert AppleALC-Audio auf Laptops
+# (11 als erster Versuch; ggf. anderen Wert probieren). "-v keepsyms=1 debug=0x100" hier ergaenzen,
+# um einen Boot-Haenger zu diagnostizieren.
+boot_args = (("alcid=11 " if is_laptop else "") + extra_boot_args.strip()).strip()
 
 config = {
     "ACPI": {"Add": acpi_add, "Delete": [], "Patch": [],
@@ -640,7 +652,7 @@ config = {
                       "PickerMode": "Builtin", "PickerVariant": "Auto", "PollAppleHotKeys": True,
                       "ShowPicker": True, "TakeoffDelay": 0, "Timeout": 10},
              "Debug": {"AppleDebug": True, "ApplePanic": True, "DisableWatchDog": True, "DisplayDelay": 0,
-                       "DisplayLevel": 2147483650, "LogModules": "*", "SysReport": False, "Target": 67},
+                       "DisplayLevel": 2147483650, "LogModules": "*", "SysReport": False, "Target": 65},
              "Entries": [],
              "Security": {"AllowSetDefault": True, "ApECID": 0, "AuthRestart": False, "BlacklistAppleUpdate": True,
                           "DmgLoading": "Signed", "EnablePassword": False, "ExposeSensitiveData": 6,
