@@ -1,8 +1,13 @@
 #!/bin/bash
 # battery.command - Batterieanzeige unter macOS aktivieren (Laptop). macOS kennt den Akku erst,
 # wenn SMCBatteryManager (VirtualSMC-Plugin) laedt; ECEnabler laesst dazu die Lenovo-EC-Werte
-# korrekt lesen (noetig fuer ThinkPads, sonst 0%/keine Anzeige). Sicher: Backup + plutil-Pruefung
-# mit automatischem Rueckbau.  sudo bash battery.command
+# korrekt lesen. Sicher: Backup + plutil-Pruefung mit automatischem Rueckbau.
+#
+# !! EXPERIMENTELL: Auf einem Referenz-T480 blieb der Boot nach diesen Kexten in der Mitte des
+# !! Ladebalkens haengen. Falls das passiert: vom USB-Stick booten -> "Macintosh HD" waehlen ->
+# !! Terminal:  sudo cp /Volumes/EFI/EFI/OC/config.plist.batbak /Volumes/EFI/EFI/OC/config.plist
+# !! -> neu starten. Damit ist alles wieder wie vorher.
+#   sudo bash battery.command
 set -o pipefail
 say(){ printf '%s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { say "Bitte mit sudo starten:  sudo bash \"$0\""; exit 1; }

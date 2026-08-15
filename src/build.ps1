@@ -27,8 +27,7 @@ param(
     [string]$AirportItlwmVersion = 'v2.3.0',
     [string]$AppleAlcVersion = '1.9.2',
     [string]$IntelBtVersion  = 'v2.4.0',
-    [string]$BrcmVersion     = '2.7.2',
-    [string]$EcEnablerVersion = '1.0.5'
+    [string]$BrcmVersion     = '2.7.2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -142,16 +141,8 @@ function Build-Payload {
         Copy-Item $src.FullName (Join-Path $kexts $k.pick) -Recurse -Force
     }
 
-    # --- SMCBatteryManager (battery status; ships inside the VirtualSMC zip) + ECEnabler ---
-    $vsmcEx = Join-Path $cache 'VirtualSMC.kext-x'
-    $smcBat = Get-ChildItem $vsmcEx -Recurse -Directory -Filter 'SMCBatteryManager.kext' | Select-Object -First 1
-    if (-not $smcBat) { throw 'SMCBatteryManager.kext not found in VirtualSMC zip' }
-    Copy-Item $smcBat.FullName (Join-Path $kexts 'SMCBatteryManager.kext') -Recurse -Force
-    $eceZip = Get-Release '1Revenger1/ECEnabler' $EcEnablerVersion "ECEnabler-$EcEnablerVersion-RELEASE.zip" (Join-Path $cache 'ecenabler.zip')
-    $eceEx  = Join-Path $cache 'ecenabler-x'; Expand-Into $eceZip $eceEx
-    $ece = Get-ChildItem $eceEx -Recurse -Directory -Filter 'ECEnabler.kext' | Select-Object -First 1
-    if (-not $ece) { throw 'ECEnabler.kext not found' }
-    Copy-Item $ece.FullName (Join-Path $kexts 'ECEnabler.kext') -Recurse -Force
+    # Battery kexts (SMCBatteryManager/ECEnabler) intentionally NOT in the payload: suspected of
+    # hanging boot on the reference T480. Post-install scripts/battery.command covers them.
 
     # --- VoodooPS2 (laptop keyboard/trackpad); config references it only on laptops ---
     $vpZip = Get-Release 'acidanthera/VoodooPS2' $VoodooPS2Version "VoodooPS2Controller-$VoodooPS2Version-RELEASE.zip" (Join-Path $cache 'voodoops2.zip')

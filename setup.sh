@@ -448,18 +448,9 @@ assemble_efi() {
     [[ -n "$alc" ]] || die EFI "AppleALC.kext nicht gefunden." "Erneut versuchen."
     cp -r "$alc" "$kexts/AppleALC.kext"
 
-    # Batterieanzeige ab Werk: SMCBatteryManager (liegt im bereits geladenen VirtualSMC-Zip) +
-    # ECEnabler (Lenovo-EC-Werte ueber 8 Bit lesen - sonst 0 %/keine Anzeige auf ThinkPads).
-    info "SMCBatteryManager wird uebernommen (Batterieanzeige)"
-    local smcbat; smcbat=$(find "$WORK/VirtualSMC" -maxdepth 3 -type d -name 'SMCBatteryManager.kext' | head -n1)
-    [[ -n "$smcbat" ]] || die EFI "SMCBatteryManager.kext nicht gefunden." "Erneut versuchen."
-    cp -r "$smcbat" "$kexts/SMCBatteryManager.kext"
-    info "ECEnabler 1.0.5 wird geladen (Batteriewerte am Lenovo-EC)"
-    fetch "https://github.com/1Revenger1/ECEnabler/releases/download/1.0.5/ECEnabler-1.0.5-RELEASE.zip" "$WORK/ECEnabler.zip"
-    unzip -q "$WORK/ECEnabler.zip" -d "$WORK/ECEnabler"
-    local ece; ece=$(find "$WORK/ECEnabler" -maxdepth 3 -type d -name 'ECEnabler.kext' | head -n1)
-    [[ -n "$ece" ]] || die EFI "ECEnabler.kext nicht gefunden." "Erneut versuchen."
-    cp -r "$ece" "$kexts/ECEnabler.kext"
+    # Batterieanzeige bewusst NICHT ab Werk: SMCBatteryManager + ECEnabler stehen im Verdacht,
+    # auf dem Referenz-T480 einen Boot-Haenger (Ladebalken Mitte) auszuloesen. Nachruestbar per
+    # scripts/battery.command (mit Backup + dokumentiertem Rettungsweg), bis sauber verifiziert.
 
     # Intel-Bluetooth ab Werk: IntelBluetoothFirmware + IntelBTPatcher (ein Zip) + BlueToolFixup
     # (aus dem BrcmPatchRAM-Release). Zusammen mit -btlfxallowanyaddr laeuft BT ohne Nacharbeit.
@@ -615,9 +606,6 @@ if is_laptop:
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Trackpad.kext", "Contents/MacOS/VoodooPS2Trackpad"),
         kext("VoodooPS2Controller.kext/Contents/PlugIns/VoodooPS2Mouse.kext", "Contents/MacOS/VoodooPS2Mouse"),
         kext("AppleALC.kext", "Contents/MacOS/AppleALC"),  # Audio (mit alcid-Boot-Arg)
-        # Batterieanzeige (VirtualSMC laedt weiter vorn in den Basis-Kexten)
-        kext("SMCBatteryManager.kext", "Contents/MacOS/SMCBatteryManager"),
-        kext("ECEnabler.kext", "Contents/MacOS/ECEnabler"),
         # Intel-Bluetooth ab Werk (Lilu ist bereits in den Basis-Kexten). BlueToolFixup ist ein
         # Lilu-Plugin und limitiert sich intern auf macOS 12+; -btlfxallowanyaddr ist gesetzt.
         kext("IntelBluetoothFirmware.kext", "Contents/MacOS/IntelBluetoothFirmware"),

@@ -39,10 +39,11 @@ public sealed class OpenCoreConfigBuilder
             var kexts = baseKexts.AsEnumerable();
             if (isLaptop)
             {
+                // Battery kexts (SMCBatteryManager/ECEnabler) are deliberately NOT baked in: they
+                // are suspected of hanging boot mid-progress-bar on the reference T480. They stay
+                // available as the optional post-install scripts/battery.command until verified.
                 kexts = kexts.Concat(LaptopInputKexts())
                     .Append(Kext("AppleALC.kext", "Contents/MacOS/AppleALC"))                     // audio (with alcid boot-arg)
-                    .Append(Kext("SMCBatteryManager.kext", "Contents/MacOS/SMCBatteryManager"))   // battery status (VirtualSMC plugin)
-                    .Append(Kext("ECEnabler.kext", "Contents/MacOS/ECEnabler"))                   // Lenovo EC battery fields
                     .Append(Kext("IntelBluetoothFirmware.kext", "Contents/MacOS/IntelBluetoothFirmware")) // Intel-BT (Lilu is a base kext)
                     .Append(Kext("IntelBTPatcher.kext", "Contents/MacOS/IntelBTPatcher"))
                     .Append(Kext("BlueToolFixup.kext", "Contents/MacOS/BlueToolFixup"));           // BT on macOS 12+ (-btlfxallowanyaddr set)
