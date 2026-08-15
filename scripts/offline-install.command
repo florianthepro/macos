@@ -1,8 +1,12 @@
 #!/bin/bash
 # offline-install.command - macOS offline installieren: EIN Kommando, keine Rueckfragen.
-# Formatiert die interne Platte automatisch, kopiert OpenCore (mit gueltiger Seriennummer)
-# auf ihre EFI-Partition -> bootet danach OHNE Stick und ist iMessage-vorbereitet, und
-# installiert macOS offline. Optionales Argument: Zielplatte (/dev/diskN); sonst Auto-Erkennung.
+# Macht bewusst NUR zwei Dinge (ersetzt Festplattendienstprogramm + Installer-Klick):
+#   1) interne Platte automatisch als APFS formatieren
+#   2) macOS-Installation vom Stick starten (offline, kein Internet)
+# Alles Weitere (OpenCore auf die interne Platte, Fixes) macht NACH der Installation
+# start-me.command per Doppelklick. Bis dahin: Stick eingesteckt lassen und im Boot-Menue
+# die Eintraege "macOS Installer" bzw. "Macintosh HD" waehlen.
+# Optionales Argument: Zielplatte (/dev/diskN); sonst Auto-Erkennung.
 set -o pipefail
 say() { printf '%s\n' "$*"; }
 say "== macOS Offline-Installer =="
@@ -19,24 +23,7 @@ if [ ! -f "$pkg" ]; then
 fi
 say "Installer: $pkg"
 
-# 2. OpenCore-EFI-Quelle auf DEMSELBEN USB-Stick finden (per Dateisystem, nicht per Name).
-efisrc=""
-selfdev="/dev/$(stat -f '%Sd' "$here" 2>/dev/null)"
-whole="$(diskutil info "$selfdev" 2>/dev/null | awk -F': *' '/Part of Whole/{print $2; exit}')"
-if [ -n "$whole" ]; then
-  for id in $(diskutil list "/dev/$whole" 2>/dev/null | awk '/^ +[0-9]+:/{print $NF}'); do
-    inf="$(diskutil info "/dev/$id" 2>/dev/null)"
-    printf '%s\n' "$inf" | grep -qiE 'File System Personality: *(MS-DOS|FAT)' || continue
-    diskutil mount "/dev/$id" >/dev/null 2>&1 \
-      || { mkdir -p "/Volumes/$id" && /sbin/mount_msdos "/dev/$id" "/Volumes/$id" >/dev/null 2>&1; }
-    mp="$(diskutil info "/dev/$id" 2>/dev/null | awk -F': *' '/Mount Point/{print $2; exit}' | sed 's/[[:space:]]*$//')"
-    [ -n "$mp" ] && [ -d "$mp/EFI/OC" ] && { efisrc="$mp/EFI"; break; }
-  done
-fi
-if [ -n "$efisrc" ]; then say "OpenCore-Quelle: $efisrc"
-else say "!! OpenCore-EFI auf dem Stick nicht gefunden - EFI wird NICHT kopiert (dann Stick eingesteckt lassen)."; fi
-
-# 3. Zielplatte: Argument, sonst genau eine interne, nicht-entfernbare physische Platte.
+# 2. Zielplatte: Argument, sonst genau eine interne, nicht-entfernbare physische Platte.
 if [ -n "$1" ]; then
   target="$1"
 else
@@ -58,42 +45,18 @@ target="$(printf '%s' "$target" | tr -d ' ')"
 say "Zielplatte: $target"
 diskutil info "$target" 2>/dev/null | grep -E 'Device / Media Name|Disk Size' | sed 's/^/   /'
 
-# 4. Sicherheits-Countdown (kein Tippen noetig; Abbruch mit Strg-C).
+# 3. Sicherheits-Countdown (kein Tippen noetig; Abbruch mit Strg-C).
 say ""
 say ">> $target wird KOMPLETT GELOESCHT und macOS neu installiert."
 say ">> Abbruch mit Strg-C. Start in:"
 i=10; while [ "$i" -gt 0 ]; do printf ' %s' "$i"; sleep 1; i=$((i-1)); done; say ""
 
-# 5. Formatieren (APFS / GUID -> legt zugleich die interne EFI-Partition an).
+# 4. Formatieren (APFS / GUID).
 say "- Platte wird als APFS formatiert..."
 diskutil eraseDisk APFS "Macintosh HD" GPT "$target" || { say "Formatieren fehlgeschlagen."; exit 1; }
 tvol="/Volumes/Macintosh HD"
 
-# 6. OpenCore auf die interne EFI-Partition kopieren: bootet ohne Stick, traegt die gueltige
-#    Seriennummer fuer iMessage, und die Install-Reboots laufen von selbst weiter (kein Haenger).
-if [ -n "$efisrc" ]; then
-  esp="$(diskutil list "$target" 2>/dev/null | awk '/^ +[0-9]+:.*EFI /{print $NF; exit}')"
-  if [ -n "$esp" ]; then
-    diskutil mount "/dev/$esp" >/dev/null 2>&1
-    espmp="$(diskutil info "/dev/$esp" 2>/dev/null | awk -F': *' '/Mount Point/{print $2; exit}' | sed 's/[[:space:]]*$//')"
-    if [ -n "$espmp" ]; then
-      if ditto "$efisrc" "$espmp/EFI"; then
-        say "- OpenCore auf interne EFI kopiert ($espmp/EFI)."
-        # Sauberer Boot auf dem installierten System: Picker aus, kurzer Timeout.
-        # (Der USB-Stick behaelt seinen Picker fuers Installieren; nur die interne
-        #  Kopie bootet direkt durch.)
-        icfg="$espmp/EFI/EFI/OC/config.plist"; [ -f "$icfg" ] || icfg="$espmp/EFI/OC/config.plist"
-        if [ -f "$icfg" ]; then
-          /usr/libexec/PlistBuddy -c "Set :Misc:Boot:ShowPicker false" "$icfg" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Set :Misc:Boot:Timeout 2" "$icfg" 2>/dev/null
-          /usr/bin/plutil -lint "$icfg" >/dev/null 2>&1 || say "  (Hinweis: Picker-Anpassung uebersprungen)"
-        fi
-      else say "!! EFI-Kopie fehlgeschlagen - Stick beim Installieren eingesteckt lassen."; fi
-    fi
-  fi
-fi
-
-# 7. Installer-App aus dem pkg bauen (auf der frischen Platte - dort ist Platz).
+# 5. Installer-App aus dem pkg bauen (auf der frischen Platte - dort ist Platz).
 say "- Installer wird entpackt (gross, bitte warten)..."
 build="$tvol/.macOS-Installer"; mkdir -p "$build"
 caffeinate -d -i pkgutil --expand-full "$pkg" "$build/pkg" || { say "Entpacken fehlgeschlagen (pkgutil)."; exit 1; }
@@ -101,12 +64,15 @@ app="$(find "$build/pkg" -maxdepth 4 -name 'Install macOS*.app' -type d 2>/dev/n
 [ -d "$app" ] || { say "Installer-App im entpackten Paket nicht gefunden."; exit 1; }
 say "- App: $app"
 
-# 8. Installation starten (nicht-interaktiv). Fallback: Installer-App direkt starten.
+# 6. Installation starten (nicht-interaktiv). Fallback: Installer-App direkt starten.
 say ""
-say "*** WICHTIG FUER GLEICH: Wenn nach dem Neustart wieder das Boot-Menue kommt,"
-say "*** NICHT 'macOS Base System' waehlen, sondern den NEUEN Eintrag 'macOS Installer'."
-say "*** Das ggf. bei jedem weiteren Neustart wiederholen ('macOS Installer' bzw."
-say "*** spaeter 'Macintosh HD'), bis der Willkommensassistent erscheint."
+say "*** WICHTIG FUER GLEICH:"
+say "*** - Stick die GANZE Installation ueber eingesteckt lassen."
+say "*** - Erscheint nach einem Neustart das Boot-Menue: den NEUEN Eintrag"
+say "***   'macOS Installer' waehlen (NICHT 'macOS Base System'), spaeter"
+say "***   'Macintosh HD' - bis der Willkommensassistent kommt."
+say "*** - Nach dem ersten Anmelden: auf dem Stick start-me.command doppelklicken"
+say "***   (kopiert OpenCore auf die Platte -> bootet danach OHNE Stick, macht Fixes)."
 say ""
 say "- Installation wird gestartet..."
 soi="$app/Contents/Resources/startosinstall"
@@ -118,12 +84,10 @@ if printf '%s\n' "$out" | grep -qi 'not currently supported in the Recovery'; th
   wait
 fi
 
-# 9. startosinstall loest den Neustart in der Recovery oft NICHT selbst aus -> selbst neu starten.
-#    (Kehrt startosinstall zurueck, ist die Vorbereitung abgeschlossen; der eigentliche Install
-#    laeuft nach dem Boot des Eintrags 'macOS Installer' weiter.)
+# 7. startosinstall loest den Neustart in der Recovery oft NICHT selbst aus -> selbst neu starten.
 say ""
 say "== Vorbereitung abgeschlossen. NEUSTART in 10 Sekunden."
-say "   Im Boot-Menue danach:  'macOS Installer'  waehlen (NICHT 'Base System')."
+say "   Danach im Boot-Menue:  'macOS Installer'  waehlen (NICHT 'Base System')."
 sync
 i=10; while [ $i -gt 0 ]; do printf '\r   Neustart in %2d s ... ' "$i"; sleep 1; i=$((i-1)); done; echo
 reboot 2>/dev/null || shutdown -r now 2>/dev/null || say "!! Bitte von Hand neu starten (Apfel-Menue > Neustart)."

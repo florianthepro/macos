@@ -17,8 +17,9 @@ Grafik und Tastatur sind – soweit macOS es zulässt – **ab Werk** dabei.
 - Starten → **macOS‑Version** wählen → **„Offline"** ankreuzen (empfohlen: installiert ohne Internet) → **USB‑Stick** wählen → **flashen** und warten.
 
 **2. Installieren**
-- Vom Stick booten (im Firmware‑Menü **UEFI USB** wählen; CSM/Legacy aus).
-- Im OpenCore‑Menü **„macOS installieren"** anklicken – **online** (lädt von Apple) *oder* **offline** (vom Stick, kein Internet). Kein Terminal, keine Partitionierung – den Bildschirmanweisungen folgen und warten. Der Rechner startet dabei ein paar Mal selbst neu.
+- Vom Stick booten (im Firmware‑Menü **UEFI USB** wählen; CSM/Legacy aus) → **„macOS Base System"**.
+- **Offline:** Terminal öffnen, das eine Kommando aus der `INSTALL.txt` ausführen – es formatiert automatisch und startet die Installation (keine manuelle Partitionierung). **Online:** „macOS installieren" wählen und dem Assistenten folgen.
+- **Stick eingesteckt lassen.** Bei jedem Neustart im Boot‑Menü **„macOS Installer"** wählen (nicht „Base System"), später **„Macintosh HD"** – bis der Willkommensassistent kommt.
 
 **3. Einmal `start-me.command`**
 - Nach dem ersten Start von macOS liegt **`start-me.command`** auf dem Stick (bzw. Desktop). **Doppelklick** – das war's. Es:

@@ -880,9 +880,11 @@ $(if (( OFFLINE == 1 )); then cat <<OFF
   6.  Dienstprogramme -> Terminal, EIN Kommando:
         bash "/Volumes/MACOS-DATA/offline-install.command"
       (formatiert automatisch + installiert, keine Rueckfragen)
-  7.  Nach dem Neustart im Boot-Menue "macOS Installer" waehlen (NICHT
-      "Base System"), bis der Willkommensassistent erscheint.
-  8.  KEIN Internet noetig - der komplette Installer liegt auf dem Stick.
+  7.  Nach dem Neustart (Stick drin lassen) im Boot-Menue "macOS Installer"
+      waehlen (NICHT "Base System"), bis der Willkommensassistent erscheint.
+  8.  Nach dem ersten Anmelden: start-me.command vom Stick doppelklicken
+      (OpenCore auf die Platte + Fixes) - danach bootet es OHNE Stick.
+  9.  KEIN Internet noetig - der komplette Installer liegt auf dem Stick.
       Details/Alternativen stehen in INSTALL.txt auf der Datenpartition.
 OFF
 else cat <<ON
@@ -962,10 +964,15 @@ Dieser Stick enthaelt den KOMPLETTEN Installer - es wird KEIN Internet benoetigt
    Mehrere interne Platten? Mit Ziel starten, z. B.:
      bash "/Volumes/MACOS-DATA/offline-install.command" /dev/disk0
 
-3. Der Rechner startet danach neu. WICHTIG: Erscheint wieder das Boot-Menue,
-   den NEUEN Eintrag "macOS Installer" waehlen - NICHT "macOS Base System"!
-   Bei jedem weiteren Neustart wiederholen ("macOS Installer", spaeter
-   "Macintosh HD"), bis der Willkommensassistent erscheint.
+3. Der Rechner startet danach neu. Stick EINGESTECKT LASSEN. WICHTIG:
+   Erscheint wieder das Boot-Menue, den NEUEN Eintrag "macOS Installer"
+   waehlen - NICHT "macOS Base System"! Bei jedem weiteren Neustart
+   wiederholen ("macOS Installer", spaeter "Macintosh HD"), bis der
+   Willkommensassistent erscheint.
+
+4. Nach dem ersten Anmelden: auf dem Stick "start-me.command" doppelklicken.
+   Das kopiert OpenCore auf die interne Platte (bootet danach OHNE Stick)
+   und richtet Tastatur/Feinschliff ein. Danach Stick abziehen.
 
 Nur bei Sonoma/Sequoia, falls "MACOS-DATA" fehlt:
      diskutil list physical

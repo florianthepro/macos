@@ -169,10 +169,15 @@ public sealed class UsbBuildJob
             Gibt es mehrere interne Platten, das Skript mit Ziel starten, z. B.:
               bash "/Volumes/{DataLabelForReadme}/offline-install.command" /dev/disk0
 
-         3. Der Rechner startet danach neu. WICHTIG: Erscheint wieder das Boot-Menü,
-            den NEUEN Eintrag "macOS Installer" wählen - NICHT "macOS Base System"!
-            Das bei jedem weiteren Neustart wiederholen ("macOS Installer", später
-            "Macintosh HD"), bis der Willkommensassistent erscheint.
+         3. Der Rechner startet danach neu. Stick EINGESTECKT LASSEN. WICHTIG:
+            Erscheint wieder das Boot-Menü, den NEUEN Eintrag "macOS Installer"
+            wählen - NICHT "macOS Base System"! Bei jedem weiteren Neustart
+            wiederholen ("macOS Installer", später "Macintosh HD"), bis der
+            Willkommensassistent erscheint.
+
+         4. Nach dem ersten Anmelden: auf dem Stick "start-me.command" doppelklicken.
+            Das kopiert OpenCore auf die interne Platte (bootet danach OHNE Stick)
+            und richtet Tastatur/Feinschliff ein. Danach Stick abziehen.
 
          Nur bei macOS Sonoma/Sequoia, falls "{DataLabelForReadme}" fehlt:
               diskutil list physical
