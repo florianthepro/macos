@@ -169,6 +169,11 @@ public sealed class UsbBuildJob
             Gibt es mehrere interne Platten, das Skript mit Ziel starten, z. B.:
               bash "/Volumes/{DataLabelForReadme}/offline-install.command" /dev/disk0
 
+         3. Der Rechner startet danach neu. WICHTIG: Erscheint wieder das Boot-Menü,
+            den NEUEN Eintrag "macOS Installer" wählen - NICHT "macOS Base System"!
+            Das bei jedem weiteren Neustart wiederholen ("macOS Installer", später
+            "Macintosh HD"), bis der Willkommensassistent erscheint.
+
          Nur bei macOS Sonoma/Sequoia, falls "{DataLabelForReadme}" fehlt:
               diskutil list physical
               mkdir "/Volumes/{DataLabelForReadme}"

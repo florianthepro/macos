@@ -102,6 +102,12 @@ app="$(find "$build/pkg" -maxdepth 4 -name 'Install macOS*.app' -type d 2>/dev/n
 say "- App: $app"
 
 # 8. Installation starten (nicht-interaktiv). Fallback: Installer-App direkt starten.
+say ""
+say "*** WICHTIG FUER GLEICH: Wenn nach dem Neustart wieder das Boot-Menue kommt,"
+say "*** NICHT 'macOS Base System' waehlen, sondern den NEUEN Eintrag 'macOS Installer'."
+say "*** Das ggf. bei jedem weiteren Neustart wiederholen ('macOS Installer' bzw."
+say "*** spaeter 'Macintosh HD'), bis der Willkommensassistent erscheint."
+say ""
 say "- Installation wird gestartet..."
 soi="$app/Contents/Resources/startosinstall"
 out="$(caffeinate -d -i "$soi" --volume "$tvol" --nointeraction --agreetolicense 2>&1)"; say "$out"
@@ -112,7 +118,12 @@ if printf '%s\n' "$out" | grep -qi 'not currently supported in the Recovery'; th
   wait
 fi
 
+# 9. startosinstall loest den Neustart in der Recovery oft NICHT selbst aus -> selbst neu starten.
+#    (Kehrt startosinstall zurueck, ist die Vorbereitung abgeschlossen; der eigentliche Install
+#    laeuft nach dem Boot des Eintrags 'macOS Installer' weiter.)
 say ""
-say "== Fertig. Der Rechner startet neu und installiert weiter."
-say "   Falls das OpenCore-Menue erscheint: 'macOS Installer' waehlen, bis der"
-say "   Willkommensbildschirm kommt. Danach bootet die Platte OHNE Stick."
+say "== Vorbereitung abgeschlossen. NEUSTART in 10 Sekunden."
+say "   Im Boot-Menue danach:  'macOS Installer'  waehlen (NICHT 'Base System')."
+sync
+i=10; while [ $i -gt 0 ]; do printf '\r   Neustart in %2d s ... ' "$i"; sleep 1; i=$((i-1)); done; echo
+reboot 2>/dev/null || shutdown -r now 2>/dev/null || say "!! Bitte von Hand neu starten (Apfel-Menue > Neustart)."
