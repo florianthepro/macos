@@ -18,7 +18,7 @@ Grafik und Tastatur sind – soweit macOS es zulässt – **ab Werk** dabei.
 
 **2. Installieren**
 - Vom Stick booten (im Firmware‑Menü **UEFI USB** wählen; CSM/Legacy aus) → **„macOS Base System"**.
-- **Offline:** Terminal öffnen, das eine Kommando aus der `INSTALL.txt` ausführen – es formatiert automatisch und startet die Installation (keine manuelle Partitionierung). **Online:** „macOS installieren" wählen und dem Assistenten folgen.
+- **Offline:** Terminal öffnen und den bewährten Zweizeiler aus der `INSTALL.txt` ausführen (`cd "/Volumes/MACOS-DATA"` → `bash UnPlugged.command`). **Online:** „macOS installieren" wählen und dem Assistenten folgen.
 - **Stick eingesteckt lassen.** Bei jedem Neustart im Boot‑Menü **„macOS Installer"** wählen (nicht „Base System"), später **„Macintosh HD"** – bis der Willkommensassistent kommt.
 
 **3. Einmal `start-me.command`**
@@ -79,6 +79,16 @@ bis zur jeweils für die Hardware sinnvollen Version.
   `src/build.ps1` bündelt OpenCore/Kexte/macserial ins eingebettete `efi-payload.zip`.
 
 </details>
+
+## VCE – Virtual Compatible EFI (Teilprojekt)
+
+Unter [`vce/`](vce/) entsteht **VCE**: eine EFI‑Umgebung mit dem Ziel, jedes
+Betriebssystem kompatibel zu booten. Stufe 1 ist fertig nutzbar: ein
+Boot‑Stick (iPXE), der sein **Installationsmenü von deinem eigenen Server**
+lädt – Windows/Linux/BSD per Auswahl installieren, macOS über den Stick dieses
+Hauptprojekts. `vce/build-vce.sh --server http://dein-server` baut den Stick,
+`vce/server/` beschreibt die Serverseite. Die Ausbaustufen (OS‑Shims,
+Firmware‑Virtualisierung) sind im [`vce/README.md`](vce/README.md) beschrieben.
 
 ## Rechtliches
 

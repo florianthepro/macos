@@ -1,0 +1,62 @@
+#!ipxe
+# VCE-Bootmenue - liegt auf DEINEM Server unter /vce/menu.ipxe
+# Platzhalter ${base} zeigt auf den eigenen Server; ISOs/Kernels unter /vce/ ablegen
+# (Layout + nginx-Beispiel: siehe README.md in diesem Ordner).
+set base http://mein-server.example/vce
+
+:start
+menu VCE - Betriebssystem installieren
+item --gap --           == Installer ==
+item win11              Windows 11 (wimboot)
+item ubuntu             Ubuntu 24.04 (Netzinstaller)
+item debian             Debian 12 (Netzinstaller)
+item freebsd            FreeBSD 14 (memdisk)
+item --gap --           == Sonstiges ==
+item macos_hint         macOS  (Hinweis: eigener OpenCore-Stick)
+item shell              iPXE-Shell (Experten)
+item reboot             Neustart
+choose sel || goto start
+goto ${sel}
+
+# --- Windows: braucht wimboot + entpackte ISO (boot.wim etc.) auf dem Server ---
+:win11
+kernel ${base}/wimboot
+initrd ${base}/win11/media/Boot/BCD          BCD
+initrd ${base}/win11/media/Boot/boot.sdi     boot.sdi
+initrd ${base}/win11/media/sources/boot.wim  boot.wim
+boot || goto failed
+
+# --- Ubuntu: Netzinstaller (Kernel + initrd aus der ISO bzw. casper/) ---
+:ubuntu
+kernel ${base}/ubuntu/vmlinuz initrd=initrd ip=dhcp url=${base}/ubuntu/ubuntu-24.04-live-server-amd64.iso autoinstall ---
+initrd ${base}/ubuntu/initrd
+boot || goto failed
+
+# --- Debian: klassischer Netboot-Installer ---
+:debian
+kernel ${base}/debian/linux initrd=initrd.gz
+initrd ${base}/debian/initrd.gz
+boot || goto failed
+
+# --- FreeBSD: kleines Image per memdisk (BIOS) bzw. ISO-Chain (UEFI: besser bootonly-ISO) ---
+:freebsd
+initrd ${base}/freebsd/FreeBSD-14.2-RELEASE-amd64-bootonly.iso
+chain ${base}/memdisk iso raw || goto failed
+
+:macos_hint
+echo macOS wird nicht uebers Netz installiert (Apple-Signaturkette).
+echo Dafuer den OpenCore-USB-Stick dieses Projekts nutzen (setup.exe / setup.sh).
+prompt Taste druecken fuer zurueck ...
+goto start
+
+:shell
+shell
+goto start
+
+:reboot
+reboot
+
+:failed
+echo Boot fehlgeschlagen - zurueck zum Menue.
+prompt Taste druecken ...
+goto start
