@@ -56,6 +56,26 @@ und installiert die Stufe‑2‑Schicht vollautomatisch; danach bootet die Masch
 in das **VCE‑VM‑Menü** (VM anlegen → ISO vom Server → installieren – alles in
 virtueller Hardware).
 
+## Leitprinzip: stabile virtuelle Hardware
+
+VCE folgt einem festen Prinzip: **pro Geräteklasse gibt es genau eine virtuelle
+Schnittstelle, die sich nie ändert** (virtio: Platte, Netz, Eingabe, Sound,
+Grafik). Die Übersetzung zur echten Hardware macht ausschließlich der VCE‑Host
+(Linux‑Treiber + KVM). Daraus folgt:
+
+- **Hardware tauschen ⇒ nur der Übersetzer (Host‑Seite) ändert sich.** Das
+  Gast‑OS merkt nichts, denn seine virtuelle Hardware bleibt identisch.
+- **OS‑Images werden portabel („Golden Images"):** ein einmal vorbereitetes
+  Image (virtio‑Treiber enthalten – Linux/BSD ab Werk, Windows einmalig
+  virtio‑win) läuft unverändert auf jeder VCE‑Maschine.
+- Geplanter Ausbau: **Vorlagen‑Images auf dem Server** (`images/`) +
+  „VM aus Vorlage" im VCE‑Menü (qcow2‑Backing‑Files = Sekunden‑Klone).
+
+Bekannte Lücken im heutigen stabilen Gerätemodell (ehrlich): **Kamera**
+(virtio-camera noch nicht mainline; Übergang: USB‑Passthrough) und
+**Batterie‑Anzeige im Gast** (kein virtuelles ACPI‑Batteriegerät in
+Stock‑QEMU; lösbar per Gast‑Agent). Beides liegt auf der VCE‑Roadmap.
+
 ## Grenzen (keine falschen Erwartungen)
 
 - **macOS** ist per Design ausgenommen (Apple‑Signaturkette) – der Menüpunkt
