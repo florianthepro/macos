@@ -43,17 +43,18 @@ VCE-Stick / OpenCore-Tool                Dein Server (setup-server.sh)
 └──────────────────────────┘          └────────────────────────────────┘
 ```
 
-## Architektur‑Stufen (ehrlich getrennt)
+## Architektur‑Stufen
 
 | Stufe | Was | Status |
 | --- | --- | --- |
-| **1 – Universal‑Boot + Netz‑Installer** | Bootmenü (iPXE) vom eigenen Server; Windows (wimboot), Linux (Kernel/initrd), BSD (sanboot) laufen **nativ** – Kompatibilität über den jeweils richtigen Boot‑Pfad, nicht über Emulation. | ✅ **fertig (dieses Verzeichnis)** |
-| **2 – Kompatibilitäts‑Shims pro OS** | Verallgemeinerung des OpenCore‑Prinzips: pro OS ein Profil (ACPI‑Overlays, Geräte‑Injektion, Firmware‑Variablen), das die reale Hardware passend präsentiert. | 🔬 geplant |
-| **3 – Firmware‑Virtualisierung** | Schlanker Typ‑1‑Hypervisor unter dem OS mit virtueller Standard‑Hardware (virtio‑NIC, AHCI, Standard‑Framebuffer), sodass *unmodifizierte* OS‑Images überall laufen. Eigenes Hypervisor‑Projekt (Größenordnung Jahre). | 🧭 Fernziel |
+| **1 – Universal‑Boot + Netz‑Installer** | Bootmenü (iPXE) vom eigenen Server; Windows (wimboot), Linux (Kernel/initrd), BSD (sanboot) laufen **nativ** auf der echten Hardware. | ✅ fertig |
+| **2 – VCE‑Host (Virtualisierung)** | **VCE spricht mit der echten Hardware, das Gast‑OS sieht nur virtuelle Hardware**: virtuelle Festplatte (qcow2), **eigenes virtuelles EFI pro VM** (OVMF‑NVRAM‑Kopie – Gast‑Bootloader landen *unter* dem echten EFI, nie darauf), virtio‑Netz, Q35. Install: über den Menüpunkt **„VCE‑Host installieren"** (vollautomatisches Debian‑Preseed) oder `host/provision-host.sh` auf einem Debian. Details: [`host/README.md`](host/README.md). | ✅ **fertig** |
+| **3 – Firmware‑Virtualisierung** | Dasselbe direkt in der Firmware (Typ‑1‑Hypervisor ohne Linux‑Schicht). | 🧭 Fernziel |
 
-Stufe 1 liefert das Nutzererlebnis der Vision bereits vollständig für
-Windows/Linux/BSD; die Stufen 2/3 machen daraus schrittweise „läuft überall,
-unmodifiziert".
+Der Menüpunkt „VCE‑Host installieren" verbindet beide Stufen: Stufe 1 bootet
+und installiert die Stufe‑2‑Schicht vollautomatisch; danach bootet die Maschine
+in das **VCE‑VM‑Menü** (VM anlegen → ISO vom Server → installieren – alles in
+virtueller Hardware).
 
 ## Grenzen (keine falschen Erwartungen)
 

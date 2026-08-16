@@ -1,0 +1,37 @@
+# VCE-Host - vollautomatische Debian-Installation (Preseed).
+# @URL@ ersetzt setup-server.sh durch die echte Server-Basis (http://.../vce).
+# ACHTUNG: loescht die erste Platte vollstaendig und installiert den VCE-Host.
+d-i debian-installer/locale string de_DE.UTF-8
+d-i keyboard-configuration/xkb-keymap select de
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string vce-host
+d-i netcfg/get_domain string local
+d-i mirror/country string manual
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+# Root-Passwort initial "vce" - nach dem ersten Login aendern (passwd)!
+d-i passwd/root-login boolean true
+d-i passwd/root-password password vce
+d-i passwd/root-password-again password vce
+d-i passwd/make-user boolean false
+d-i clock-setup/utc boolean true
+d-i time/zone string Europe/Berlin
+# Ganze erste Platte automatisch (eine Partition + Swap), ohne Rueckfragen
+d-i partman-auto/method string regular
+d-i partman-auto/choose_recipe select atomic
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+# Minimalsystem + SSH
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/upgrade select safe-upgrade
+popularity-contest popularity-contest/participate boolean false
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/bootdev string default
+# VCE-Host-Provisionierung direkt aus dem Installer heraus
+d-i preseed/late_command string \
+  in-target sh -c "curl -fsSL @URL@/host/provision-host.sh -o /root/vce-provision.sh"; \
+  in-target sh -c "bash /root/vce-provision.sh @SERVER@ || true"
+d-i finish-install/reboot_in_progress note

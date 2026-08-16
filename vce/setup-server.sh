@@ -43,7 +43,22 @@ if [ "$WITH_DEBIAN" = 1 ]; then
   curl -fsSL "$dbase/initrd.gz" -o "$V/debian/initrd.gz"
 fi
 
-# 3) menu.ipxe mit eingesetzter URL erzeugen
+# 3) VCE-Host-Dateien (Provisionierung, Menue, Preseed) mit ausliefern
+here="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if [ -d "$here/host" ]; then
+  say "- VCE-Host-Dateien werden abgelegt"
+  mkdir -p "$V/host"
+  cp "$here/host/provision-host.sh" "$V/host/provision-host.sh" 2>/dev/null || say "  (provision-host.sh fehlt)"
+  cp "$here/host/vce-menu.sh"       "$V/host/vce-menu.sh"       2>/dev/null || say "  (vce-menu.sh fehlt)"
+  if [ -f "$here/host/preseed.cfg.template" ]; then
+    sed -e "s#@URL@#$URL/vce#g" -e "s#@SERVER@#$URL#g" \
+      "$here/host/preseed.cfg.template" > "$V/host/preseed.cfg"
+  fi
+else
+  say "  (host/-Ordner nicht gefunden - VCE-Host-Menuepunkt wird trotzdem angelegt)"
+fi
+
+# 4) menu.ipxe mit eingesetzter URL erzeugen
 say "- menu.ipxe wird erzeugt"
 cat > "$V/menu.ipxe" <<EOF
 #!ipxe
@@ -56,12 +71,21 @@ item win11              Windows 11 (wimboot)
 item ubuntu             Ubuntu 24.04 (Live-ISO)
 item debian             Debian 12 (Netzinstaller)
 item freebsd            FreeBSD 14 (bootonly)
+item --gap --           == VCE ==
+item vcehost            VCE-Host installieren (Virtualisierung, automatisch)
 item --gap --           == Sonstiges ==
 item macos_hint         macOS  (eigener OpenCore-Stick)
 item shell              iPXE-Shell (Experten)
 item reboot             Neustart
 choose sel || goto start
 goto \${sel}
+
+:vcehost
+echo ACHTUNG: Loescht die erste Platte und installiert den VCE-Host (Debian+KVM).
+prompt Enter = weiter, Strg-C = abbrechen ...
+kernel \${base}/debian/linux initrd=initrd.gz auto=true priority=critical preseed/url=\${base}/host/preseed.cfg
+initrd \${base}/debian/initrd.gz
+boot || goto failed
 
 :win11
 kernel \${base}/wimboot
@@ -120,6 +144,10 @@ win11/media/   -> Inhalt der Windows-11-ISO hierher ENTPACKEN (Boot/, sources/, 
 ubuntu/        -> vmlinuz + initrd (aus der ISO, Ordner casper/) und die ISO als ubuntu.iso
 freebsd/       -> FreeBSD-…-bootonly.iso als freebsd-bootonly.iso
 debian/        -> $( [ "$WITH_DEBIAN" = 1 ] && echo "FERTIG (linux + initrd.gz liegen bereit)" || echo "linux + initrd.gz (oder setup-server.sh --with-debian erneut ausfuehren)" )
+isos/          -> beliebige Install-ISOs fuer VMs auf dem VCE-Host (laedt dessen Menue per Name)
+
+Hinweis: Der Menuepunkt "VCE-Host installieren" braucht den Debian-Netzinstaller
+(--with-debian) und loescht die erste Platte des Zielgeraets vollautomatisch.
 
 Test vom Client:  curl -I $URL/vce/menu.ipxe   -> muss 200 liefern
 EOF

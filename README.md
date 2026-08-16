@@ -82,13 +82,14 @@ bis zur jeweils für die Hardware sinnvollen Version.
 
 ## VCE – Virtual Compatible EFI (Teilprojekt)
 
-Unter [`vce/`](vce/) entsteht **VCE**: eine EFI‑Umgebung mit dem Ziel, jedes
-Betriebssystem kompatibel zu booten. Stufe 1 ist fertig nutzbar: ein
-Boot‑Stick (iPXE), der sein **Installationsmenü von deinem eigenen Server**
-lädt – Windows/Linux/BSD per Auswahl installieren, macOS über den Stick dieses
-Hauptprojekts. `vce/build-vce.sh --server http://dein-server` baut den Stick,
-`vce/server/` beschreibt die Serverseite. Die Ausbaustufen (OS‑Shims,
-Firmware‑Virtualisierung) sind im [`vce/README.md`](vce/README.md) beschrieben.
+Unter [`vce/`](vce/) lebt **VCE** (eigenständig, jederzeit als eigenes Repo
+auslagerbar): ein Boot‑Stick (iPXE), der sein **Installationsmenü von deinem
+eigenen Server** lädt – Windows/Linux/BSD nativ installieren – und der
+**VCE‑Host**: eine Virtualisierungsschicht (Debian+KVM, vollautomatisch über
+den Menüpunkt „VCE‑Host installieren"), bei der das Gast‑OS **virtuelle
+Hardware** bekommt – virtuelle Festplatte und **eigenes virtuelles EFI pro VM**,
+sodass Gast‑Bootloader nie das echte EFI berühren. Details:
+[`vce/README.md`](vce/README.md).
 
 ## Rechtliches
 
