@@ -94,16 +94,52 @@ delete_vm(){
   die "VM '$name' geloescht."
 }
 
+# Kiosk-Modus: die Standard-VM startet beim Einschalten automatisch in Vollbild -
+# der Nutzer sieht nie VCE, nur sein OS. VM beenden -> Menue erscheint.
+set_autostart(){
+  local name; name="$(pick_vm "Standard-VM (startet beim Einschalten automatisch)")" || {
+    dialog --yesno "Autostart AUSSCHALTEN?" 7 45 && { sed -i '/^AUTOSTART=/d' "$CONF" 2>/dev/null; die "Autostart aus."; }
+    return; }
+  [ -n "$name" ] || return
+  sed -i '/^AUTOSTART=/d' "$CONF" 2>/dev/null
+  printf 'AUTOSTART=%s\n' "$name" >> "$CONF"
+  die "'$name' startet ab jetzt beim Einschalten automatisch (Vollbild).\nZum Menue: VM herunterfahren."
+}
+
+run_vm(){ # $1=Name - Start ohne Rueckfragen (Kiosk), Vollbild auf der Konsole
+  local name="$1" RAM=4096 CPU=2
+  [ -f "$D/$name.conf" ] && . "$D/$name.conf"
+  local accel=(); have_kvm && accel=(-enable-kvm -cpu host) || accel=(-cpu qemu64)
+  export SDL_VIDEODRIVER=kmsdrm
+  qemu-system-x86_64 "${accel[@]}" -M q35 -smp "$CPU" -m "$RAM" \
+    -drive if=pflash,format=raw,readonly=on,file="$CODE" \
+    -drive if=pflash,format=raw,file="$NVRAM/$name.fd" \
+    -drive if=virtio,format=qcow2,file="$DISKS/$name.qcow2" \
+    -nic user,model=virtio-net-pci -display sdl -vga virtio
+}
+
+autostart_check(){
+  # nur beim ersten Menuestart nach dem Boot, und nur wenn eine Standard-VM gesetzt ist
+  [ -n "${AUTOSTART:-}" ] || return 0
+  [ -f /run/vce-autostarted ] && return 0
+  touch /run/vce-autostarted 2>/dev/null || true
+  [ -f "$DISKS/$AUTOSTART.qcow2" ] || return 0
+  clear; echo "VCE: Standard-VM '$AUTOSTART' startet ... (Menue erscheint nach dem Beenden)"
+  run_vm "$AUTOSTART" || true
+}
+
 info(){
   local k="nein"; have_kvm && k="ja"
   die "VCE-Host\n\nServer:  ${SERVER:-'-'}\nKVM:     $k\nVMs:     $(vm_list | tr '\n' ' ')\nDisks:   $DISKS\nISOs:    $ISOS\nEFI-NVRAM: $NVRAM"
 }
 
 command -v dialog >/dev/null || { echo "dialog fehlt (apt install dialog)"; exec bash; }
+autostart_check
 while :; do
-  sel="$(dialog --stdout --no-cancel --menu "VCE - Virtual Compatible EFI  (Host)" 17 62 9 \
+  sel="$(dialog --stdout --no-cancel --menu "VCE - Virtual Compatible EFI  (Host)" 18 62 10 \
     start  "VM starten" \
     new    "Neue VM anlegen" \
+    auto   "Standard-VM festlegen (Autostart beim Einschalten)" \
     iso    "ISO vom Server laden" \
     del    "VM loeschen" \
     info   "Status" \
@@ -113,6 +149,7 @@ while :; do
   case "$sel" in
     start) start_vm ;;
     new)   create_vm ;;
+    auto)  set_autostart ;;
     iso)   fetch_iso ;;
     del)   delete_vm ;;
     info)  info ;;

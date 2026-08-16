@@ -53,7 +53,15 @@ EOF
 systemctl daemon-reload
 say "- Konsole 1 startet kuenftig direkt das VCE-Menue"
 
-# 5) KVM-Verfuegbarkeit pruefen (nur Hinweis - Provisionierung schlaegt nicht fehl)
+# 5) Host verschlanken: alles abschalten, was der Uebersetzerschicht nichts bringt.
+#    (Ziel: minimaler RAM-/CPU-Fussabdruck - VCE soll fast nichts nehmen.)
+for svc in bluetooth.service cups.service cups-browsed.service avahi-daemon.service \
+           ModemManager.service wpa_supplicant.service exim4.service; do
+  systemctl disable --now "$svc" >/dev/null 2>&1 || true
+done
+say "- Unnoetige Dienste deaktiviert (schlanker Host)"
+
+# 6) KVM-Verfuegbarkeit pruefen (nur Hinweis - Provisionierung schlaegt nicht fehl)
 if [ -e /dev/kvm ]; then say "- KVM aktiv (/dev/kvm vorhanden)"
 else say "!! /dev/kvm fehlt: VT-x/AMD-V im BIOS aktivieren - VMs laufen sonst nur langsam (TCG)."; fi
 

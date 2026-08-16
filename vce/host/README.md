@@ -51,6 +51,25 @@ sudo ./provision-host.sh http://mein-server.example
 - Dateien: Disks `/var/lib/vce/disks/`, ISOs `/var/lib/vce/isos/`,
   EFI-NVRAM `/var/lib/vce/nvram/`.
 
+## Effizienz & Unsichtbarkeit (die VCE-Ziele)
+
+**VCE soll für den Nutzer unsichtbar sein und fast nichts kosten.** Dazu:
+
+- **Kiosk-Modus:** im Menü einmal „Standard-VM festlegen" – ab dann bootet das
+  Gerät **direkt in das OS** (Vollbild), ohne dass der Nutzer VCE je sieht.
+  Erst wenn das OS heruntergefahren wird, erscheint das VCE-Menü.
+- **CPU kostet (fast) nichts:** KVM emuliert keine CPU – Gast-Code läuft
+  **nativ** auf dem Prozessor (VT-x/AMD-V). Die Schicht arbeitet nur bei
+  Ein-/Ausgabe; virtio (Platte/Netz) ist nahe nativ.
+- **RAM-Fußabdruck:** Debian-minimal-Host heute ~300–500 MB. Ziel-Profil
+  (Roadmap): Alpine/Buildroot-Host nur mit Kernel + KVM + Menü → **~100–150 MB**.
+- **Passthrough (Roadmap):** GPU/NVMe per VFIO **direkt** an die Standard-VM →
+  null Übersetzungskosten für die schweren Geräte. (Bewusster Tausch: dieses
+  eine Gerät braucht dann wieder echte Gast-Treiber.)
+- Bewusst **kein** eigener Mikro-Hypervisor mit eigenen Treibern (à la ESXi):
+  minimal kleiner, aber er würde das Treiber-Universum kosten – VCE liefe dann
+  nur noch auf einer Kompatibilitätsliste statt auf jeder Hardware.
+
 ## Ehrliche Grenzen
 
 - Braucht **VT-x/AMD-V** (bei praktisch jedem Gerät seit ~2010 vorhanden; im
