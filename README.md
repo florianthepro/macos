@@ -18,7 +18,7 @@ Grafik und Tastatur sind – soweit macOS es zulässt – **ab Werk** dabei.
 
 **2. Installieren**
 - Vom Stick booten (im Firmware‑Menü **UEFI USB** wählen; CSM/Legacy aus) → **„macOS Base System"**.
-- **Offline:** Terminal öffnen und den bewährten Zweizeiler aus der `INSTALL.txt` ausführen (`cd "/Volumes/MACOS-DATA"` → `bash UnPlugged.command`). **Online:** „macOS installieren" wählen und dem Assistenten folgen.
+- **Offline:** Terminal öffnen, das **eine** Kommando aus der `INSTALL.txt` ausführen – es formatiert automatisch und startet die Installation (keine manuelle Partitionierung; Fallback `UnPlugged.command` steht daneben). **Online:** „macOS installieren" wählen und dem Assistenten folgen.
 - **Stick eingesteckt lassen.** Bei jedem Neustart im Boot‑Menü **„macOS Installer"** wählen (nicht „Base System"), später **„Macintosh HD"** – bis der Willkommensassistent kommt.
 
 **3. Einmal `start-me.command`**

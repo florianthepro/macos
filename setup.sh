@@ -877,10 +877,9 @@ finish() {
   4.  Im OpenCore-Menue "macOS Base System" starten.
   5.  Festplattendienstprogramm oeffnen und das Ziellaufwerk als APFS loeschen.
 $(if (( OFFLINE == 1 )); then cat <<OFF
-  6.  Dienstprogramme -> Terminal, zwei Zeilen (bewaehrter Weg):
-        cd "/Volumes/MACOS-DATA"
-        bash UnPlugged.command
-      (Automatische Alternative: bash offline-install.command - formatiert selbst)
+  6.  Dienstprogramme -> Terminal, EIN Kommando:
+        bash "/Volumes/MACOS-DATA/offline-install.command"
+      (formatiert automatisch + installiert; Fallback: UnPlugged.command)
   7.  Nach dem Neustart (Stick drin lassen) im Boot-Menue "macOS Installer"
       waehlen (NICHT "Base System"), bis der Willkommensassistent erscheint.
   8.  Nach dem ersten Anmelden: start-me.command vom Stick doppelklicken
@@ -954,19 +953,17 @@ Offline-Installation von macOS $name
 Dieser Stick enthaelt den KOMPLETTEN Installer - es wird KEIN Internet benoetigt.
 
 1. Stick booten, im OpenCore-Menue "macOS Base System" waehlen.
-2. Dienstprogramme -> Terminal. Zwei Zeilen:
+2. Dienstprogramme -> Terminal. EIN Kommando:
 
-     cd "/Volumes/MACOS-DATA"
-     bash UnPlugged.command
-
-   (Der bewaehrte Weg. Fragt UnPlugged nach dem Ziel: vorher im
-   Festplattendienstprogramm die interne Platte als APFS "Macintosh HD"
-   loeschen.)
-
-   Automatische Alternative (formatiert selbst, keine Rueckfragen,
-   10-s-Countdown):
      bash "/Volumes/MACOS-DATA/offline-install.command"
+
+   Formatiert die interne Platte automatisch und startet die Installation -
+   keine manuelle Formatierung, keine Rueckfragen (10-s-Countdown, Strg-C bricht ab).
    Mehrere interne Platten? Ziel angeben: ... offline-install.command /dev/disk0
+
+   Fallback, falls das Kommando hakt (interaktiv):
+     cd "/Volumes/MACOS-DATA" && bash UnPlugged.command
+   (dann vorher im Festplattendienstprogramm als APFS "Macintosh HD" loeschen)
 
 3. Der Rechner startet danach neu. Stick EINGESTECKT LASSEN. WICHTIG:
    Erscheint wieder das Boot-Menue, den NEUEN Eintrag "macOS Installer"

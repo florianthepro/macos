@@ -45,7 +45,7 @@ chain ${base}/memdisk iso raw || goto failed
 
 :macos_hint
 echo macOS wird nicht uebers Netz installiert (Apple-Signaturkette).
-echo Dafuer den OpenCore-USB-Stick dieses Projekts nutzen (setup.exe / setup.sh).
+echo Dafuer einen OpenCore-Installations-Stick nutzen (z. B. aus dem macOS-Projekt).
 prompt Taste druecken fuer zurueck ...
 goto start
 

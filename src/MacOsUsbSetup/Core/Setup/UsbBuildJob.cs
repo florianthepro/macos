@@ -158,18 +158,19 @@ public sealed class UsbBuildJob
          Dieser Stick enthält den KOMPLETTEN Installer - es wird KEIN Internet benötigt.
 
          1. Stick booten, im OpenCore-Menü "macOS Base System" wählen.
-         2. Menüleiste: Dienstprogramme -> Terminal öffnen. Zwei Zeilen:
+         2. Menüleiste: Dienstprogramme -> Terminal öffnen. EIN Kommando:
 
-              cd "/Volumes/{DataLabelForReadme}"
-              bash UnPlugged.command
-
-            (Der bewährte Weg. Vorher im Festplattendienstprogramm die interne
-            Platte als APFS "Macintosh HD" löschen, falls UnPlugged danach fragt.)
-
-            Automatische Alternative (formatiert selbst, keine Rückfragen,
-            10-s-Countdown):
               bash "/Volumes/{DataLabelForReadme}/offline-install.command"
-            Mehrere interne Platten? Ziel angeben:  ... offline-install.command /dev/disk0
+
+            Formatiert die interne Platte automatisch und startet die Installation -
+            keine manuelle Formatierung, keine Rückfragen (10-s-Countdown, Abbruch
+            mit Strg-C). Mehrere interne Platten? Ziel angeben:
+              bash "/Volumes/{DataLabelForReadme}/offline-install.command" /dev/disk0
+
+            Fallback, falls das Kommando auf deinem Gerät hakt (interaktiv):
+              cd "/Volumes/{DataLabelForReadme}" && bash UnPlugged.command
+            (dann vorher im Festplattendienstprogramm die interne Platte als
+            APFS "Macintosh HD" löschen)
 
          3. Der Rechner startet danach neu. Stick EINGESTECKT LASSEN. WICHTIG:
             Erscheint wieder das Boot-Menü, den NEUEN Eintrag "macOS Installer"
