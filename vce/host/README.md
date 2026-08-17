@@ -51,6 +51,23 @@ sudo ./provision-host.sh http://mein-server.example
 - Dateien: Disks `/var/lib/vce/disks/`, ISOs `/var/lib/vce/isos/`,
   EFI-NVRAM `/var/lib/vce/nvram/`.
 
+## Partitionslayout & Boot-Ablauf
+
+Die automatische Installation legt ein sauberes Zwei-Partitionen-Schema an
+(plus die uebliche EFI-Partition):
+
+```
+ESP (EFI)      512 MB   Bootkette - gehoert VCE
+System        ~16 GB   der schlanke VCE-Host (austauschbar/aktualisierbar)
+DATEN       Rest der    alle VMs + ISOs, gemappt nach /var/lib/vce
+             Platte     (System und Daten bleiben sauber getrennt)
+```
+
+**Boot-Ablauf bei jedem Einschalten:** kurzes Fenster (3 s) -
+„Standard-OS startet ... beliebige Taste fuer Auswahl". Keine Taste -> das
+Standard-OS bootet in Vollbild. Taste gedrueckt -> das Auswahl-/VM-Menue
+erscheint (anderes OS starten, neue VM, ISO laden, ...).
+
 ## Effizienz & Unsichtbarkeit (die VCE-Ziele)
 
 **VCE soll für den Nutzer unsichtbar sein und fast nichts kosten.** Dazu:

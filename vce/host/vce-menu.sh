@@ -119,13 +119,22 @@ run_vm(){ # $1=Name - Start ohne Rueckfragen (Kiosk), Vollbild auf der Konsole
 }
 
 autostart_check(){
-  # nur beim ersten Menuestart nach dem Boot, und nur wenn eine Standard-VM gesetzt ist
+  # Bei JEDEM Boot: kurzes Fenster - Taste druecken = Auswahl-Menue, sonst startet
+  # das Standard-OS automatisch. (Nur beim ersten Menuestart nach dem Boot.)
   [ -n "${AUTOSTART:-}" ] || return 0
   [ -f /run/vce-autostarted ] && return 0
   touch /run/vce-autostarted 2>/dev/null || true
   [ -f "$DISKS/$AUTOSTART.qcow2" ] || return 0
-  clear; echo "VCE: Standard-VM '$AUTOSTART' startet ... (Menue erscheint nach dem Beenden)"
-  run_vm "$AUTOSTART" || true
+  clear
+  echo "=================================================="
+  echo "  VCE   Standard-OS:  $AUTOSTART"
+  echo "=================================================="
+  echo "  Startet automatisch in 3 Sekunden."
+  echo "  BELIEBIGE TASTE druecken fuer Boot-/OS-Auswahl."
+  if read -r -s -n 1 -t 3 _ 2>/dev/null; then
+    return 0            # Taste gedrueckt -> Auswahl-Menue anzeigen
+  fi
+  run_vm "$AUTOSTART" || true   # Timeout -> Standard-OS starten (Menue nach Beenden)
 }
 
 info(){
